@@ -59,7 +59,7 @@ app.get('/', (req, res) => {
         <h1>Joke Generator</h1>
         <p>What would you like your joke to be about?</p>
         <form action="/get_joke" method="POST">
-            <input type="text" name="topic" maxlength="40" placeholder="Enter a topic..." required>
+            <input type="text" name="topic" maxlength="64" placeholder="Enter a topic..." required>
             <br>
             <button type="submit">Tell me my joke</button>
         </form>
