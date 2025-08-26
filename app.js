@@ -29,12 +29,11 @@ function renderTemplate(templateName, data = {}) {
     return html;
   }
   
-  // Simple template replacement
-  for (const [key, value] of Object.entries(data)) {
-    html = html.replace(new RegExp(`{{${key}}}`, 'g'), value);
-  }
+  // Single-pass replacement to avoid cascading substitutions
+  const keys = Object.keys(data).join('|');
+  const regex = new RegExp(`{{(${keys})}}`, 'g');
   
-  return html;
+  return html.replace(regex, (match, key) => data[key]);
 }
 
 app.get('/', (req, res) => {
