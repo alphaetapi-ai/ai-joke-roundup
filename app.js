@@ -1,4 +1,6 @@
 import express from 'express';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { Ollama } from '@langchain/community/llms/ollama';
 import { ConversationChain } from 'langchain/chains';
 import { BufferMemory } from 'langchain/memory';
@@ -17,55 +19,26 @@ const conversations = new Map();
 
 app.use(express.urlencoded({ extended: true }));
 
+// Helper function to load and render templates
+function renderTemplate(templateName, data = {}) {
+  const templatePath = join(process.cwd(), 'templates', `${templateName}.html`);
+  let html = readFileSync(templatePath, 'utf-8');
+  
+  // Skip processing if no data to substitute
+  if (Object.keys(data).length === 0) {
+    return html;
+  }
+  
+  // Simple template replacement
+  for (const [key, value] of Object.entries(data)) {
+    html = html.replace(new RegExp(`{{${key}}}`, 'g'), value);
+  }
+  
+  return html;
+}
+
 app.get('/', (req, res) => {
-  res.send(`
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Joke Generator</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                max-width: 600px;
-                margin: 50px auto;
-                padding: 20px;
-                text-align: center;
-            }
-            input[type="text"] {
-                padding: 10px;
-                font-size: 16px;
-                width: 300px;
-                margin: 10px;
-                border: 2px solid #ccc;
-                border-radius: 4px;
-            }
-            button {
-                padding: 10px 20px;
-                font-size: 16px;
-                background-color: #4CAF50;
-                color: white;
-                border: none;
-                border-radius: 4px;
-                cursor: pointer;
-            }
-            button:hover {
-                background-color: #45a049;
-            }
-        </style>
-    </head>
-    <body>
-        <h1>Joke Generator</h1>
-        <p>What would you like your joke to be about?</p>
-        <form action="/get_joke" method="POST">
-            <input type="text" name="topic" maxlength="64" placeholder="Enter a topic..." required>
-            <br>
-            <button type="submit">Tell me my joke</button>
-        </form>
-    </body>
-    </html>
-  `);
+  res.send(renderTemplate('index'));
 });
 
 function getOrCreateConversation(sessionId) {
@@ -97,103 +70,13 @@ app.post('/get_joke', async (req, res) => {
     });
     const explanation = explanationResponse.response;
 
-    res.send(`
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Your Joke</title>
-          <style>
-              body {
-                  font-family: Arial, sans-serif;
-                  max-width: 600px;
-                  margin: 50px auto;
-                  padding: 20px;
-                  text-align: center;
-              }
-              .joke {
-                  background-color: #f9f9f9;
-                  padding: 20px;
-                  border-radius: 8px;
-                  margin: 20px 0;
-                  font-size: 18px;
-                  line-height: 1.6;
-              }
-              .explanation {
-                  background-color: #e8f4f8;
-                  padding: 20px;
-                  border-radius: 8px;
-                  margin: 20px 0;
-                  font-size: 16px;
-                  line-height: 1.6;
-                  text-align: left;
-              }
-              .explanation h3 {
-                  margin-top: 0;
-                  text-align: center;
-              }
-              a {
-                  color: #4CAF50;
-                  text-decoration: none;
-              }
-              a:hover {
-                  text-decoration: underline;
-              }
-          </style>
-      </head>
-      <body>
-          <h1>Your Joke About "${topic}"</h1>
-          <div class="joke">${joke}</div>
-          <div class="explanation">
-              <h3>The basis for this joke:</h3>
-              ${explanation}
-          </div>
-          <p><a href="/">← Get another joke</a></p>
-      </body>
-      </html>
-    `);
+    res.send(renderTemplate('joke', { 
+      topic: topic, 
+      joke: joke, 
+      explanation: explanation 
+    }));
   } catch (error) {
-    res.send(`
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Error</title>
-          <style>
-              body {
-                  font-family: Arial, sans-serif;
-                  max-width: 600px;
-                  margin: 50px auto;
-                  padding: 20px;
-                  text-align: center;
-              }
-              .error {
-                  color: #d32f2f;
-                  background-color: #ffebee;
-                  padding: 20px;
-                  border-radius: 8px;
-                  margin: 20px 0;
-              }
-              a {
-                  color: #4CAF50;
-                  text-decoration: none;
-              }
-              a:hover {
-                  text-decoration: underline;
-              }
-          </style>
-      </head>
-      <body>
-          <h1>Oops!</h1>
-          <div class="error">
-              Sorry, I couldn't generate a joke right now. Make sure Ollama is running!
-          </div>
-          <p><a href="/">← Try again</a></p>
-      </body>
-      </html>
-    `);
+    res.send(renderTemplate('error'));
   }
 });
 
