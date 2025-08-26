@@ -1,8 +1,19 @@
 import express from 'express';
-import fetch from 'node-fetch';
+import { Ollama } from '@langchain/community/llms/ollama';
+import { ConversationChain } from 'langchain/chains';
+import { BufferMemory } from 'langchain/memory';
 
 const app = express();
 const port = 3000;
+
+// Initialize LangChain with Ollama
+const llm = new Ollama({
+  baseUrl: 'http://localhost:11434',
+  model: 'llama3.2:latest',
+});
+
+// Store conversation history by session (in production, use a proper database)
+const conversations = new Map();
 
 app.use(express.urlencoded({ extended: true }));
 
@@ -57,24 +68,34 @@ app.get('/', (req, res) => {
   `);
 });
 
+function getOrCreateConversation(sessionId) {
+  if (!conversations.has(sessionId)) {
+    const memory = new BufferMemory();
+    const chain = new ConversationChain({ llm, memory });
+    conversations.set(sessionId, chain);
+  }
+  return conversations.get(sessionId);
+}
+
 app.post('/get_joke', async (req, res) => {
   const topic = req.body.topic;
+  // Simple session ID - in production, use proper session management
+  const sessionId = req.ip + Date.now();
   
   try {
-    const response = await fetch('http://localhost:11434/api/generate', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'llama3.2:latest',
-        prompt: `Tell me a joke about ${topic}. Reply with just the joke.`,
-        stream: false
-      })
+    const conversation = getOrCreateConversation(sessionId);
+    
+    // Get the joke
+    const jokeResponse = await conversation.call({
+      input: `Tell me a joke about ${topic}. Reply with just the joke.`
     });
+    const joke = jokeResponse.response;
 
-    const data = await response.json();
-    const joke = data.response;
+    // Get explanation in same conversation (LangChain remembers the context)
+    const explanationResponse = await conversation.call({
+      input: 'Explain why this joke is funny.'
+    });
+    const explanation = explanationResponse.response;
 
     res.send(`
       <!DOCTYPE html>
@@ -99,6 +120,19 @@ app.post('/get_joke', async (req, res) => {
                   font-size: 18px;
                   line-height: 1.6;
               }
+              .explanation {
+                  background-color: #e8f4f8;
+                  padding: 20px;
+                  border-radius: 8px;
+                  margin: 20px 0;
+                  font-size: 16px;
+                  line-height: 1.6;
+                  text-align: left;
+              }
+              .explanation h3 {
+                  margin-top: 0;
+                  text-align: center;
+              }
               a {
                   color: #4CAF50;
                   text-decoration: none;
@@ -111,6 +145,10 @@ app.post('/get_joke', async (req, res) => {
       <body>
           <h1>Your Joke About "${topic}"</h1>
           <div class="joke">${joke}</div>
+          <div class="explanation">
+              <h3>The basis for this joke:</h3>
+              ${explanation}
+          </div>
           <p><a href="/">← Get another joke</a></p>
       </body>
       </html>
