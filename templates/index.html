@@ -32,6 +32,17 @@
         button:hover {
             background-color: #45a049;
         }
+        .style-selection {
+            margin: 15px 0;
+        }
+        .style-selection label {
+            display: inline-block;
+            margin: 0 15px;
+            font-size: 16px;
+        }
+        input[type="radio"] {
+            margin-right: 5px;
+        }
     </style>
 </head>
 <body>
@@ -40,6 +51,16 @@
     <form action="/get_joke" method="POST">
         <input type="text" name="topic" maxlength="64" placeholder="Enter a topic..." required>
         <br>
+        <div class="style-selection">
+            <label>
+                <input type="radio" name="style" value="normal" checked>
+                Normal
+            </label>
+            <label>
+                <input type="radio" name="style" value="story">
+                Story
+            </label>
+        </div>
         <button type="submit">Tell me my joke</button>
     </form>
 </body>

@@ -51,15 +51,23 @@ function getOrCreateConversation(sessionId) {
 
 app.post('/get_joke', async (req, res) => {
   const topic = req.body.topic;
+  const style = req.body.style || 'normal';
   // Simple session ID - in production, use proper session management
   const sessionId = req.ip + Date.now();
   
   try {
     const conversation = getOrCreateConversation(sessionId);
     
-    // Get the joke
+    // Get the joke with appropriate prompt based on style
+    let jokePrompt;
+    if (style === 'story') {
+      jokePrompt = `Tell me a narrative story-style joke about ${topic}. Make it a short story with a funny punchline, not a question and answer format. Reply with just the joke.`;
+    } else {
+      jokePrompt = `Tell me a joke about ${topic}. Reply with just the joke.`;
+    }
+    
     const jokeResponse = await conversation.call({
-      input: `Tell me a joke about ${topic}. Reply with just the joke.`
+      input: jokePrompt
     });
     const joke = jokeResponse.response;
 
@@ -72,7 +80,8 @@ app.post('/get_joke', async (req, res) => {
     res.send(renderTemplate('joke', { 
       topic: topic, 
       joke: joke, 
-      explanation: explanation 
+      explanation: explanation,
+      style: style
     }));
   } catch (error) {
     res.send(renderTemplate('error'));
