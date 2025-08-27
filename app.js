@@ -18,6 +18,7 @@ const llm = new Ollama({
 const conversations = new Map();
 
 app.use(express.urlencoded({ extended: true }));
+app.use(express.static('public'));
 
 // Helper function to load and render templates
 function renderTemplate(templateName, data = {}) {
@@ -36,9 +37,7 @@ function renderTemplate(templateName, data = {}) {
   return html.replace(regex, (match, key) => data[key]);
 }
 
-app.get('/', (req, res) => {
-  res.send(renderTemplate('index'));
-});
+// Static files (index.html, error.html) are now served by express.static
 
 function getOrCreateConversation(sessionId) {
   if (!conversations.has(sessionId)) {
@@ -84,7 +83,7 @@ app.post('/get_joke', async (req, res) => {
       style: style
     }));
   } catch (error) {
-    res.send(renderTemplate('error'));
+    res.redirect('/error.html');
   }
 });
 
