@@ -19,7 +19,13 @@
             </tr>
         </thead>
         <tbody>
-            {{jokes_rows}}
+            <% jokes.forEach(function(joke) { %>
+                <tr>
+                    <td><%= joke.date_created %></td>
+                    <td><%= joke.topic %></td>
+                    <td><a href="/joke/<%= joke.joke_id %>"><%= joke.preview %></a></td>
+                </tr>
+            <% }); %>
         </tbody>
     </table>
 </body>

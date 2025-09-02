@@ -1,6 +1,4 @@
 import express from 'express';
-import { readFileSync } from 'fs';
-import { join } from 'path';
 import { Ollama } from '@langchain/community/llms/ollama';
 import { ConversationChain } from 'langchain/chains';
 import { BufferMemory } from 'langchain/memory';
@@ -12,6 +10,10 @@ dotenv.config();
 
 const app = express();
 const port = 3000;
+
+// Configure EJS as the template engine
+app.set('view engine', 'ejs');
+app.set('views', './templates');
 
 // Response size limits
 const JOKE_LIMIT = 1024;
@@ -111,22 +113,7 @@ async function getJokeById(jokeId) {
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
-// Helper function to load and render templates
-function renderTemplate(templateName, data = {}) {
-  const templatePath = join(process.cwd(), 'templates', `${templateName}.html`);
-  let html = readFileSync(templatePath, 'utf-8');
-  
-  // Skip processing if no data to substitute
-  if (Object.keys(data).length === 0) {
-    return html;
-  }
-  
-  // Single-pass replacement to avoid cascading substitutions
-  const keys = Object.keys(data).join('|');
-  const regex = new RegExp(`{{(${keys})}}`, 'g');
-  
-  return html.replace(regex, (match, key) => data[key]);
-}
+// EJS templating is now configured and handled by Express
 
 // Static files (index.html) are now served by express.static
 
@@ -134,8 +121,8 @@ app.get('/recent_jokes', async (req, res) => {
   try {
     const jokes = await getRecentJokes();
     
-    // Generate table rows with truncated jokes
-    const jokesRows = jokes.map(joke => {
+    // Process jokes with truncated previews
+    const processedJokes = jokes.map(joke => {
       let jokePreview = joke.joke_content;
       
       // Truncate to 128 bytes if needed
@@ -150,17 +137,16 @@ app.get('/recent_jokes', async (req, res) => {
         jokePreview = jokePreview.substring(0, truncateAt) + '...';
       }
       
-      return `<tr>
-        <td>${joke.date_created}</td>
-        <td>${joke.topic}</td>
-        <td><a href="/joke/${joke.joke_id}">${jokePreview}</a></td>
-      </tr>`;
-    }).join('');
+      return {
+        ...joke,
+        preview: jokePreview
+      };
+    });
     
-    res.send(renderTemplate('recent_jokes', { jokes_rows: jokesRows }));
+    res.render('recent_jokes', { jokes: processedJokes });
   } catch (error) {
     console.error('Error fetching recent jokes:', error);
-    res.send(renderTemplate('error', { message: 'Sorry, I couldn\'t load the recent jokes right now.' }));
+    res.render('error', { message: 'Sorry, I couldn\'t load the recent jokes right now.' });
   }
 });
 
@@ -168,24 +154,24 @@ app.get('/joke/:id', async (req, res) => {
   try {
     const jokeId = parseInt(req.params.id);
     if (isNaN(jokeId)) {
-      return res.send(renderTemplate('error', { message: 'Invalid joke ID.' }));
+      return res.render('error', { message: 'Invalid joke ID.' });
     }
     
     const joke = await getJokeById(jokeId);
     if (!joke) {
-      return res.send(renderTemplate('error', { message: 'Joke not found.' }));
+      return res.render('error', { message: 'Joke not found.' });
     }
     
-    res.send(renderTemplate('joke_detail', {
+    res.render('joke_detail', {
       topic: joke.topic,
       type: joke.type.charAt(0).toUpperCase() + joke.type.slice(1), // Capitalize first letter
       date_created: joke.date_created,
       joke_content: joke.joke_content,
       explanation: joke.explanation
-    }));
+    });
   } catch (error) {
     console.error('Error fetching joke:', error);
-    res.send(renderTemplate('error', { message: 'Sorry, I couldn\'t load that joke right now.' }));
+    res.render('error', { message: 'Sorry, I couldn\'t load that joke right now.' });
   }
 });
 
@@ -204,7 +190,7 @@ app.post('/get_joke', async (req, res) => {
   
   // Validate topic length (same as client-side limit)
   if (!topic || topic.length > 64) {
-    return res.send(renderTemplate('error', { message: 'Your topic is too long! Please keep it to 64 characters or less.' }));
+    return res.render('error', { message: 'Your topic is too long! Please keep it to 64 characters or less.' });
   }
   
   // Simple session ID - in production, use proper session management
@@ -242,7 +228,7 @@ app.post('/get_joke', async (req, res) => {
       
       retries++;
       if (retries > maxRetries) {
-        return res.send(renderTemplate('error', { message: 'Sorry, I couldn\'t generate a joke within the size limit after multiple attempts. Please try again.' }));
+        return res.render('error', { message: 'Sorry, I couldn\'t generate a joke within the size limit after multiple attempts. Please try again.' });
       }
     }
 
@@ -274,14 +260,14 @@ app.post('/get_joke', async (req, res) => {
       // Continue serving the joke even if database storage fails
     }
 
-    res.send(renderTemplate('joke', { 
+    res.render('joke', { 
       topic: topic, 
       joke: joke, 
       explanation: explanation,
       style: style
-    }));
+    });
   } catch (error) {
-    res.send(renderTemplate('error', { message: 'Sorry, I couldn\'t generate a joke right now. Make sure Ollama is running!' }));
+    res.render('error', { message: 'Sorry, I couldn\'t generate a joke right now. Make sure Ollama is running!' });
   }
 });
 
