@@ -177,9 +177,10 @@ async function getJokeById(jokeId) {
   const connection = await mysql.createConnection(dbConfig);
   try {
     const [rows] = await connection.execute(
-      `SELECT j.joke_content, j.explanation, j.type, DATE_FORMAT(j.date_created, '%Y-%b-%d') as date_created, t.topic 
+      `SELECT j.joke_content, j.explanation, j.type, DATE_FORMAT(j.date_created, '%Y-%b-%d') as date_created, t.topic, m.model_name 
        FROM jokes j 
        JOIN topics t ON j.topic_id = t.topic_id 
+       JOIN models m ON j.model_id = m.model_id 
        WHERE j.joke_id = ?`,
       [jokeId]
     );
@@ -257,7 +258,8 @@ app.get('/joke/:id', async (req, res) => {
       type: joke.type.charAt(0).toUpperCase() + joke.type.slice(1), // Capitalize first letter
       date_created: joke.date_created,
       joke_content: joke.joke_content,
-      explanation: joke.explanation
+      explanation: joke.explanation,
+      model_name: joke.model_name
     });
   } catch (error) {
     console.error('Error fetching joke:', error);
