@@ -2,6 +2,9 @@
     <tr>
         <td><%= joke.date_created %></td>
         <td><%= useCompact ? joke.topic_preview : joke.topic %></td>
+        <% if (!useCompact) { %>
+            <td><%= joke.type.charAt(0).toUpperCase() + joke.type.slice(1) %></td>
+        <% } %>
         <td>
             <div class="tooltip">
                 <a href="/joke/<%= joke.joke_id %>"><%= useCompact ? joke.joke_preview : joke.preview %></a>

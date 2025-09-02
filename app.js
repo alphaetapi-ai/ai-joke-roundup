@@ -101,7 +101,7 @@ async function getRecentJokes(limit = 50) {
   const connection = await mysql.createConnection(dbConfig);
   try {
     const [rows] = await connection.execute(
-      `SELECT j.joke_id, j.joke_content, DATE_FORMAT(j.date_created, '%Y-%b-%d') as date_created, t.topic 
+      `SELECT j.joke_id, j.joke_content, j.type, DATE_FORMAT(j.date_created, '%Y-%b-%d') as date_created, t.topic 
        FROM jokes j 
        JOIN topics t ON j.topic_id = t.topic_id 
        ORDER BY j.date_created DESC, j.joke_id DESC 
