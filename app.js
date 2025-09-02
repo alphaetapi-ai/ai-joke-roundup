@@ -100,7 +100,20 @@ app.post('/get_joke', async (req, res) => {
     const explanationResponse = await conversation.call({
       input: 'Explain why this joke is funny.'
     });
-    const explanation = explanationResponse.response;
+    let explanation = explanationResponse.response;
+    
+    // Truncate explanation if it exceeds 1024 bytes
+    if (Buffer.byteLength(explanation, 'utf8') > 1024) {
+      // Find the position to truncate at to leave room for ellipsis
+      let truncateAt = 1021; // 1024 - 3 bytes for '...'
+      
+      // Make sure we don't cut in the middle of a UTF-8 character
+      while (truncateAt > 0 && Buffer.byteLength(explanation.substring(0, truncateAt), 'utf8') > 1021) {
+        truncateAt--;
+      }
+      
+      explanation = explanation.substring(0, truncateAt) + '...';
+    }
 
     res.send(renderTemplate('joke', { 
       topic: topic, 
