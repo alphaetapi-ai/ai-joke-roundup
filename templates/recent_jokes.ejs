@@ -8,21 +8,23 @@
 </head>
 <body>
     <%- include('_header') %>
-    <h1>Recent Jokes</h1>
-    <p><a href="/">← Back to Joke Generator</a></p>
-    
-    <table class="jokes-table">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Topic</th>
-                <th>Type</th>
-                <th>Joke Preview</th>
-            </tr>
-        </thead>
-        <tbody>
-            <%- include('_joke_table_rows', { jokes: jokes, useCompact: false }) %>
-        </tbody>
-    </table>
+    <div class="container">
+        <h1>Recent Jokes</h1>
+        <p><a href="/">← Back to Joke Generator</a></p>
+        
+        <table class="jokes-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Topic</th>
+                    <th>Type</th>
+                    <th>Joke Preview</th>
+                </tr>
+            </thead>
+            <tbody>
+                <%- include('_joke_table_rows', { jokes: jokes, useCompact: false }) %>
+            </tbody>
+        </table>
+    </div>
 </body>
 </html>
