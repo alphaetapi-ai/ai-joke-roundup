@@ -8,6 +8,10 @@ import { BufferMemory } from 'langchain/memory';
 const app = express();
 const port = 3000;
 
+// Response size limits
+const JOKE_LIMIT = 1024;
+const EXPLANATION_LIMIT = 1024;
+
 // Initialize LangChain with Ollama
 const llm = new Ollama({
   baseUrl: 'http://localhost:11434',
@@ -70,7 +74,7 @@ app.post('/get_joke', async (req, res) => {
     while (retries <= maxRetries) {
       // Get the joke with appropriate prompt based on style
       let jokePrompt;
-      const lengthLimit = retries > 0 ? ' Please limit the response to 1024 bytes.' : '';
+      const lengthLimit = retries > 0 ? ` Please limit the response to ${JOKE_LIMIT} bytes.` : '';
       
       if (style === 'story') {
         jokePrompt = `Tell me a narrative story-style joke about ${topic}. Make it a short story with a funny punchline, not a question and answer format. Reply with just the joke.${lengthLimit}`;
@@ -86,7 +90,7 @@ app.post('/get_joke', async (req, res) => {
       joke = jokeResponse.response;
       
       // Check if joke is within size limit
-      if (Buffer.byteLength(joke, 'utf8') <= 1024) {
+      if (Buffer.byteLength(joke, 'utf8') <= JOKE_LIMIT) {
         break;
       }
       
@@ -102,13 +106,13 @@ app.post('/get_joke', async (req, res) => {
     });
     let explanation = explanationResponse.response;
     
-    // Truncate explanation if it exceeds 1024 bytes
-    if (Buffer.byteLength(explanation, 'utf8') > 1024) {
+    // Truncate explanation if it exceeds limit
+    if (Buffer.byteLength(explanation, 'utf8') > EXPLANATION_LIMIT) {
       // Find the position to truncate at to leave room for ellipsis
-      let truncateAt = 1021; // 1024 - 3 bytes for '...'
+      let truncateAt = EXPLANATION_LIMIT - 3; // Leave 3 bytes for '...'
       
       // Make sure we don't cut in the middle of a UTF-8 character
-      while (truncateAt > 0 && Buffer.byteLength(explanation.substring(0, truncateAt), 'utf8') > 1021) {
+      while (truncateAt > 0 && Buffer.byteLength(explanation.substring(0, truncateAt), 'utf8') > EXPLANATION_LIMIT - 3) {
         truncateAt--;
       }
       
