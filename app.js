@@ -51,6 +51,12 @@ function getOrCreateConversation(sessionId) {
 app.post('/get_joke', async (req, res) => {
   const topic = req.body.topic;
   const style = req.body.style || 'normal';
+  
+  // Validate topic length (same as client-side limit)
+  if (!topic || topic.length > 64) {
+    return res.redirect('/topic-too-long.html');
+  }
+  
   // Simple session ID - in production, use proper session management
   const sessionId = req.ip + Date.now();
   
