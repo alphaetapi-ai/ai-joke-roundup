@@ -5,6 +5,21 @@
         <% if (!useCompact) { %>
             <td><%= joke.type.charAt(0).toUpperCase() + joke.type.slice(1) %></td>
         <% } %>
+        <td style="text-align: center;">
+            <% 
+            let netRating = joke.net_rating || 0;
+            let color = 'black';
+            let displayValue = netRating.toString();
+            
+            if (netRating > 0) {
+                color = 'green';
+                displayValue = '+' + netRating;
+            } else if (netRating < 0) {
+                color = 'red';
+            }
+            %>
+            <span style="color: <%= color %>; font-weight: bold;"><%= displayValue %></span>
+        </td>
         <td>
             <div class="tooltip">
                 <a href="/joke/<%= joke.joke_id %>"><%= useCompact ? joke.joke_preview : joke.preview %></a>

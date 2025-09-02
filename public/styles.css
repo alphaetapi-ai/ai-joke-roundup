@@ -169,7 +169,12 @@ a:hover {
 
 .jokes-table th:nth-child(4),
 .jokes-table td:nth-child(4) {
-    width: 60%;
+    width: 6%;
+}
+
+.jokes-table th:nth-child(5),
+.jokes-table td:nth-child(5) {
+    width: 54%;
 }
 
 /* Compact jokes table styles for index page */
@@ -209,7 +214,12 @@ a:hover {
 
 .compact-jokes-table th:nth-child(3),
 .compact-jokes-table td:nth-child(3) {
-    width: 55%;
+    width: 8%;
+}
+
+.compact-jokes-table th:nth-child(4),
+.compact-jokes-table td:nth-child(4) {
+    width: 47%;
 }
 
 /* Custom tooltip styles */
