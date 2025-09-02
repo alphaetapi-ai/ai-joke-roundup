@@ -1,5 +1,6 @@
 import express from 'express';
 import { Ollama } from '@langchain/community/llms/ollama';
+import { ChatAnthropic } from '@langchain/anthropic';
 import { ConversationChain } from 'langchain/chains';
 import { BufferMemory } from 'langchain/memory';
 import mysql from 'mysql2/promise';
@@ -27,11 +28,20 @@ const dbConfig = {
   database: process.env.DB_DATABASE
 };
 
-// Initialize LangChain with Ollama
-const llm = new Ollama({
-  baseUrl: 'http://localhost:11434',
-  model: 'llama3.2:latest',
-});
+// Programmatic switch for LLM provider
+const USE_ANTHROPIC = process.env.ANTHROPIC_API_KEY ? true : false;
+
+// Initialize LLM (either Anthropic or Ollama)
+const llm = USE_ANTHROPIC ? 
+  new ChatAnthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY,
+    model: 'claude-3-haiku-20240307',
+    maxTokens: 1024,
+  }) :
+  new Ollama({
+    baseUrl: 'http://localhost:11434',
+    model: 'llama3.2:latest',
+  });
 
 // Store conversation history by session (in production, use a proper database)
 const conversations = new Map();
