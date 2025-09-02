@@ -54,7 +54,7 @@ app.post('/get_joke', async (req, res) => {
   
   // Validate topic length (same as client-side limit)
   if (!topic || topic.length > 64) {
-    return res.redirect('/topic-too-long.html');
+    return res.send(renderTemplate('error', { message: 'Your topic is too long! Please keep it to 64 characters or less.' }));
   }
   
   // Simple session ID - in production, use proper session management
@@ -91,7 +91,7 @@ app.post('/get_joke', async (req, res) => {
       style: style
     }));
   } catch (error) {
-    res.redirect('/error.html');
+    res.send(renderTemplate('error', { message: 'Sorry, I couldn\'t generate a joke right now. Make sure Ollama is running!' }));
   }
 });
 
