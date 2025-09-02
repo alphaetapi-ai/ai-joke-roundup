@@ -6,6 +6,7 @@ import { ConversationChain } from 'langchain/chains';
 import { BufferMemory } from 'langchain/memory';
 import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
+import natural from 'natural';
 
 // Load environment variables
 dotenv.config();
@@ -57,7 +58,52 @@ const llm = USE_GROQ ?
 // Store conversation history by session (in production, use a proper database)
 const conversations = new Map();
 
+// Text processing function to generate stemmed topics
+function generateStemmedTopic(topicText) {
+  // Convert to lowercase
+  const lowercase = topicText.toLowerCase();
+  
+  // Tokenize the text
+  const tokenizer = new natural.WordTokenizer();
+  const tokens = tokenizer.tokenize(lowercase);
+  
+  // Remove stop words
+  const stopWords = natural.stopwords;
+  const filteredTokens = tokens.filter(token => !stopWords.includes(token));
+  
+  // Stem each remaining token
+  const stemmedTokens = filteredTokens.map(token => natural.PorterStemmer.stem(token));
+  
+  // Join with spaces to create the stemmed topic key
+  return stemmedTokens.join(' ');
+}
+
 // Database helper functions
+async function findOrCreateStemTopic(topicText, stemmedTopic) {
+  const connection = await mysql.createConnection(dbConfig);
+  try {
+    // Try to find existing stem topic
+    const [rows] = await connection.execute(
+      'SELECT stem_topic_id FROM stem_topic WHERE topic_stemmed = ?',
+      [stemmedTopic]
+    );
+    
+    if (rows.length > 0) {
+      return rows[0].stem_topic_id;
+    }
+    
+    // Create new stem topic if not found
+    const [result] = await connection.execute(
+      'INSERT INTO stem_topic (topic_example, topic_stemmed) VALUES (?, ?)',
+      [topicText, stemmedTopic]
+    );
+    
+    return result.insertId;
+  } finally {
+    await connection.end();
+  }
+}
+
 async function findOrCreateTopic(topicText) {
   const connection = await mysql.createConnection(dbConfig);
   try {
@@ -71,10 +117,14 @@ async function findOrCreateTopic(topicText) {
       return rows[0].topic_id;
     }
     
-    // Create new topic if not found
+    // Generate stemmed topic and create/find stem topic record
+    const stemmedTopic = generateStemmedTopic(topicText);
+    const stemTopicId = await findOrCreateStemTopic(topicText, stemmedTopic);
+    
+    // Create new topic if not found, linking to stem topic
     const [result] = await connection.execute(
-      'INSERT INTO topics (topic) VALUES (?)',
-      [topicText]
+      'INSERT INTO topics (topic, stem_topic_id) VALUES (?, ?)',
+      [topicText, stemTopicId]
     );
     
     return result.insertId;
@@ -83,12 +133,12 @@ async function findOrCreateTopic(topicText) {
   }
 }
 
-async function storeJoke(topicId, modelId, type, jokeContent, explanation) {
+async function storeJoke(topicId, modelId, stemTopicId, type, jokeContent, explanation) {
   const connection = await mysql.createConnection(dbConfig);
   try {
     const [result] = await connection.execute(
-      'INSERT INTO jokes (topic_id, model_id, type, joke_content, explanation) VALUES (?, ?, ?, ?, ?)',
-      [topicId, modelId, type, jokeContent, explanation]
+      'INSERT INTO jokes (topic_id, model_id, stem_topic_id, type, joke_content, explanation) VALUES (?, ?, ?, ?, ?, ?)',
+      [topicId, modelId, stemTopicId, type, jokeContent, explanation]
     );
     
     return result.insertId;
@@ -358,13 +408,17 @@ app.post('/get_joke', async (req, res) => {
     try {
       const topicId = await findOrCreateTopic(topic);
       
+      // Generate stemmed topic and get/create stem topic ID
+      const stemmedTopic = generateStemmedTopic(topic);
+      const stemTopicId = await findOrCreateStemTopic(topic, stemmedTopic);
+      
       // Get the correct model name based on which provider we're using
       const modelName = USE_GROQ ? 'llama-3.1-8b-instant' :
                         USE_ANTHROPIC ? 'claude-3-haiku-20240307' : 
                         'llama3.2:latest';
       const modelId = await findOrCreateModel(modelName);
       
-      await storeJoke(topicId, modelId, style, joke, explanation);
+      await storeJoke(topicId, modelId, stemTopicId, style, joke, explanation);
     } catch (dbError) {
       console.error('Database error:', dbError);
       // Continue serving the joke even if database storage fails
