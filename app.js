@@ -63,20 +63,38 @@ app.post('/get_joke', async (req, res) => {
   try {
     const conversation = getOrCreateConversation(sessionId);
     
-    // Get the joke with appropriate prompt based on style
-    let jokePrompt;
-    if (style === 'story') {
-      jokePrompt = `Tell me a narrative story-style joke about ${topic}. Make it a short story with a funny punchline, not a question and answer format. Reply with just the joke.`;
-    } else if (style === 'limerick') {
-      jokePrompt = `Tell me a limerick-style joke about ${topic}. Make it a proper limerick with the traditional AABBA rhyme scheme and rhythm. Reply with just the limerick.`;
-    } else {
-      jokePrompt = `Tell me a joke about ${topic}. Reply with just the joke.`;
-    }
+    let joke;
+    let retries = 0;
+    const maxRetries = 3;
     
-    const jokeResponse = await conversation.call({
-      input: jokePrompt
-    });
-    const joke = jokeResponse.response;
+    while (retries <= maxRetries) {
+      // Get the joke with appropriate prompt based on style
+      let jokePrompt;
+      const lengthLimit = retries > 0 ? ' Please limit the response to 1024 bytes.' : '';
+      
+      if (style === 'story') {
+        jokePrompt = `Tell me a narrative story-style joke about ${topic}. Make it a short story with a funny punchline, not a question and answer format. Reply with just the joke.${lengthLimit}`;
+      } else if (style === 'limerick') {
+        jokePrompt = `Tell me a limerick-style joke about ${topic}. Make it a proper limerick with the traditional AABBA rhyme scheme and rhythm. Reply with just the limerick.${lengthLimit}`;
+      } else {
+        jokePrompt = `Tell me a joke about ${topic}. Reply with just the joke.${lengthLimit}`;
+      }
+      
+      const jokeResponse = await conversation.call({
+        input: jokePrompt
+      });
+      joke = jokeResponse.response;
+      
+      // Check if joke is within size limit
+      if (Buffer.byteLength(joke, 'utf8') <= 1024) {
+        break;
+      }
+      
+      retries++;
+      if (retries > maxRetries) {
+        return res.send(renderTemplate('error', { message: 'Sorry, I couldn\'t generate a joke within the size limit after multiple attempts. Please try again.' }));
+      }
+    }
 
     // Get explanation in same conversation (LangChain remembers the context)
     const explanationResponse = await conversation.call({
