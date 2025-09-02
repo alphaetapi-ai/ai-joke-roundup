@@ -78,7 +78,7 @@ async function getRecentJokes(limit = 50) {
   const connection = await mysql.createConnection(dbConfig);
   try {
     const [rows] = await connection.execute(
-      `SELECT j.joke_content, DATE_FORMAT(j.date_created, '%Y-%b-%d') as date_created, t.topic 
+      `SELECT j.joke_id, j.joke_content, DATE_FORMAT(j.date_created, '%Y-%b-%d') as date_created, t.topic 
        FROM jokes j 
        JOIN topics t ON j.topic_id = t.topic_id 
        ORDER BY j.date_created DESC, j.joke_id DESC 
@@ -86,6 +86,23 @@ async function getRecentJokes(limit = 50) {
     );
     
     return rows;
+  } finally {
+    await connection.end();
+  }
+}
+
+async function getJokeById(jokeId) {
+  const connection = await mysql.createConnection(dbConfig);
+  try {
+    const [rows] = await connection.execute(
+      `SELECT j.joke_content, j.explanation, j.type, DATE_FORMAT(j.date_created, '%Y-%b-%d') as date_created, t.topic 
+       FROM jokes j 
+       JOIN topics t ON j.topic_id = t.topic_id 
+       WHERE j.joke_id = ?`,
+      [jokeId]
+    );
+    
+    return rows.length > 0 ? rows[0] : null;
   } finally {
     await connection.end();
   }
@@ -136,7 +153,7 @@ app.get('/recent_jokes', async (req, res) => {
       return `<tr>
         <td>${joke.date_created}</td>
         <td>${joke.topic}</td>
-        <td>${jokePreview}</td>
+        <td><a href="/joke/${joke.joke_id}">${jokePreview}</a></td>
       </tr>`;
     }).join('');
     
@@ -144,6 +161,31 @@ app.get('/recent_jokes', async (req, res) => {
   } catch (error) {
     console.error('Error fetching recent jokes:', error);
     res.send(renderTemplate('error', { message: 'Sorry, I couldn\'t load the recent jokes right now.' }));
+  }
+});
+
+app.get('/joke/:id', async (req, res) => {
+  try {
+    const jokeId = parseInt(req.params.id);
+    if (isNaN(jokeId)) {
+      return res.send(renderTemplate('error', { message: 'Invalid joke ID.' }));
+    }
+    
+    const joke = await getJokeById(jokeId);
+    if (!joke) {
+      return res.send(renderTemplate('error', { message: 'Joke not found.' }));
+    }
+    
+    res.send(renderTemplate('joke_detail', {
+      topic: joke.topic,
+      type: joke.type.charAt(0).toUpperCase() + joke.type.slice(1), // Capitalize first letter
+      date_created: joke.date_created,
+      joke_content: joke.joke_content,
+      explanation: joke.explanation
+    }));
+  } catch (error) {
+    console.error('Error fetching joke:', error);
+    res.send(renderTemplate('error', { message: 'Sorry, I couldn\'t load that joke right now.' }));
   }
 });
 
