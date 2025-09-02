@@ -61,6 +61,8 @@ app.post('/get_joke', async (req, res) => {
     let jokePrompt;
     if (style === 'story') {
       jokePrompt = `Tell me a narrative story-style joke about ${topic}. Make it a short story with a funny punchline, not a question and answer format. Reply with just the joke.`;
+    } else if (style === 'limerick') {
+      jokePrompt = `Tell me a limerick-style joke about ${topic}. Make it a proper limerick with the traditional AABBA rhyme scheme and rhythm. Reply with just the limerick.`;
     } else {
       jokePrompt = `Tell me a joke about ${topic}. Reply with just the joke.`;
     }
