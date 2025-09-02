@@ -29,7 +29,8 @@ const dbConfig = {
 };
 
 // Programmatic switch for LLM provider
-const USE_ANTHROPIC = process.env.ANTHROPIC_API_KEY ? true : false;
+// const USE_ANTHROPIC = process.env.ANTHROPIC_API_KEY ? true : false;
+const USE_ANTHROPIC = false; // Temporarily hard-coded to use Ollama
 
 // Initialize LLM (either Anthropic or Ollama)
 const llm = USE_ANTHROPIC ? 
