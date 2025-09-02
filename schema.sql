@@ -23,6 +23,7 @@ CREATE TABLE stem_topic (
     stem_topic_id INT AUTO_INCREMENT PRIMARY KEY,
     topic_example VARCHAR(64) NOT NULL,
     topic_stemmed VARCHAR(64) NOT NULL,
+    visible BOOLEAN DEFAULT TRUE,
     date_suggested DATE DEFAULT (CURRENT_DATE),
     UNIQUE KEY unique_stem (topic_stemmed)
 );

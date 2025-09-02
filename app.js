@@ -58,6 +58,19 @@ const llm = USE_GROQ ?
 // Store conversation history by session (in production, use a proper database)
 const conversations = new Map();
 
+// Function to update stem topic visibility
+async function updateStemTopicVisibility(stemTopicId, visible) {
+  const connection = await mysql.createConnection(dbConfig);
+  try {
+    await connection.execute(
+      'UPDATE stem_topic SET visible = ? WHERE stem_topic_id = ?',
+      [visible, stemTopicId]
+    );
+  } finally {
+    await connection.end();
+  }
+}
+
 // Text processing function to generate stemmed topics
 function generateStemmedTopic(topicText) {
   // Convert to lowercase
@@ -84,21 +97,29 @@ async function findOrCreateStemTopic(topicText, stemmedTopic) {
   try {
     // Try to find existing stem topic
     const [rows] = await connection.execute(
-      'SELECT stem_topic_id FROM stem_topic WHERE topic_stemmed = ?',
+      'SELECT stem_topic_id, visible FROM stem_topic WHERE topic_stemmed = ?',
       [stemmedTopic]
     );
     
     if (rows.length > 0) {
-      return rows[0].stem_topic_id;
+      return { 
+        stem_topic_id: rows[0].stem_topic_id, 
+        visible: rows[0].visible,
+        isNew: false
+      };
     }
     
-    // Create new stem topic if not found
+    // Create new stem topic if not found (defaults to visible = true)
     const [result] = await connection.execute(
       'INSERT INTO stem_topic (topic_example, topic_stemmed) VALUES (?, ?)',
       [topicText, stemmedTopic]
     );
     
-    return result.insertId;
+    return { 
+      stem_topic_id: result.insertId, 
+      visible: true,
+      isNew: true
+    };
   } finally {
     await connection.end();
   }
@@ -119,12 +140,12 @@ async function findOrCreateTopic(topicText) {
     
     // Generate stemmed topic and create/find stem topic record
     const stemmedTopic = generateStemmedTopic(topicText);
-    const stemTopicId = await findOrCreateStemTopic(topicText, stemmedTopic);
+    const stemTopicInfo = await findOrCreateStemTopic(topicText, stemmedTopic);
     
     // Create new topic if not found, linking to stem topic
     const [result] = await connection.execute(
       'INSERT INTO topics (topic, stem_topic_id) VALUES (?, ?)',
-      [topicText, stemTopicId]
+      [topicText, stemTopicInfo.stem_topic_id]
     );
     
     return result.insertId;
@@ -346,6 +367,46 @@ app.post('/get_joke', async (req, res) => {
     return res.render('error', { message: 'Your topic is too long! Please keep it to 64 characters or less.' });
   }
   
+  // Check if topic is allowed (stem topic visibility check)
+  let stemTopicInfo;
+  try {
+    const stemmedTopic = generateStemmedTopic(topic);
+    stemTopicInfo = await findOrCreateStemTopic(topic, stemmedTopic);
+    
+    // If this is a new stem topic, check with AI if it's appropriate
+    if (stemTopicInfo.isNew) {
+      const conversation = getOrCreateConversation(req.ip + '_content_filter');
+      
+      const filterPrompt = `You must answer with only "YES" or "NO" - no other text. Is this topic appropriate for family-friendly workplace humor? Only answer NO if the topic involves explicit sexual content, graphic violence, hate speech, or profanity: ${topic}`;
+      
+      try {
+        const filterResponse = await conversation.call({
+          input: filterPrompt
+        });
+        
+        const aiAnswer = filterResponse.response.trim().toLowerCase();
+        console.log(`AI Content Filter - Topic: "${topic}", AI Response: "${filterResponse.response}"`);
+        
+        if (aiAnswer.includes('no') || (!aiAnswer.includes('yes') && aiAnswer.includes('n'))) {
+          // Topic is not family friendly - mark as invisible
+          console.log(`Blocking topic "${topic}" based on AI response: "${filterResponse.response}"`);
+          await updateStemTopicVisibility(stemTopicInfo.stem_topic_id, false);
+          return res.render('error', { message: 'Let\'s keep this safe for work and family friendly, please.' });
+        }
+        // If "yes" or unclear, proceed normally (stem topic remains visible = true)
+      } catch (filterError) {
+        console.error('Error filtering topic with AI:', filterError);
+        // If filtering fails, proceed with caution but log the error
+      }
+    } else if (!stemTopicInfo.visible) {
+      // Existing stem topic that's already marked as not visible
+      return res.render('error', { message: 'Let\'s keep this safe for work and family friendly, please.' });
+    }
+  } catch (error) {
+    console.error('Error checking topic visibility:', error);
+    return res.render('error', { message: 'Sorry, I couldn\'t process that topic right now.' });
+  }
+  
   // Simple session ID - in production, use proper session management
   const sessionId = req.ip + Date.now();
   
@@ -410,7 +471,7 @@ app.post('/get_joke', async (req, res) => {
       
       // Generate stemmed topic and get/create stem topic ID
       const stemmedTopic = generateStemmedTopic(topic);
-      const stemTopicId = await findOrCreateStemTopic(topic, stemmedTopic);
+      const stemTopicInfo = await findOrCreateStemTopic(topic, stemmedTopic);
       
       // Get the correct model name based on which provider we're using
       const modelName = USE_GROQ ? 'llama-3.1-8b-instant' :
@@ -418,7 +479,7 @@ app.post('/get_joke', async (req, res) => {
                         'llama3.2:latest';
       const modelId = await findOrCreateModel(modelName);
       
-      await storeJoke(topicId, modelId, stemTopicId, style, joke, explanation);
+      await storeJoke(topicId, modelId, stemTopicInfo.stem_topic_id, style, joke, explanation);
     } catch (dbError) {
       console.error('Database error:', dbError);
       // Continue serving the joke even if database storage fails
