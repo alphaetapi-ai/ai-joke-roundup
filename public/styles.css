@@ -106,3 +106,41 @@ a {
 a:hover {
     text-decoration: underline;
 }
+
+/* Jokes table styles */
+.jokes-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+}
+
+.jokes-table th,
+.jokes-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.jokes-table th {
+    background-color: #f2f2f2;
+    font-weight: bold;
+}
+
+.jokes-table tr:hover {
+    background-color: #f5f5f5;
+}
+
+.jokes-table th:nth-child(1),
+.jokes-table td:nth-child(1) {
+    width: 15%;
+}
+
+.jokes-table th:nth-child(2),
+.jokes-table td:nth-child(2) {
+    width: 20%;
+}
+
+.jokes-table th:nth-child(3),
+.jokes-table td:nth-child(3) {
+    width: 65%;
+}

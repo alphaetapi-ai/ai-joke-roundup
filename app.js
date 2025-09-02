@@ -74,6 +74,23 @@ async function storeJoke(topicId, type, jokeContent, explanation) {
   }
 }
 
+async function getRecentJokes(limit = 50) {
+  const connection = await mysql.createConnection(dbConfig);
+  try {
+    const [rows] = await connection.execute(
+      `SELECT j.joke_content, DATE_FORMAT(j.date_created, '%Y-%b-%d') as date_created, t.topic 
+       FROM jokes j 
+       JOIN topics t ON j.topic_id = t.topic_id 
+       ORDER BY j.date_created DESC, j.joke_id DESC 
+       LIMIT ${parseInt(limit)}`
+    );
+    
+    return rows;
+  } finally {
+    await connection.end();
+  }
+}
+
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
@@ -94,7 +111,41 @@ function renderTemplate(templateName, data = {}) {
   return html.replace(regex, (match, key) => data[key]);
 }
 
-// Static files (index.html, error.html) are now served by express.static
+// Static files (index.html) are now served by express.static
+
+app.get('/recent_jokes', async (req, res) => {
+  try {
+    const jokes = await getRecentJokes();
+    
+    // Generate table rows with truncated jokes
+    const jokesRows = jokes.map(joke => {
+      let jokePreview = joke.joke_content;
+      
+      // Truncate to 128 bytes if needed
+      if (Buffer.byteLength(jokePreview, 'utf8') > 128) {
+        let truncateAt = 125; // 128 - 3 bytes for '...'
+        
+        // Make sure we don't cut in the middle of a UTF-8 character
+        while (truncateAt > 0 && Buffer.byteLength(jokePreview.substring(0, truncateAt), 'utf8') > 125) {
+          truncateAt--;
+        }
+        
+        jokePreview = jokePreview.substring(0, truncateAt) + '...';
+      }
+      
+      return `<tr>
+        <td>${joke.date_created}</td>
+        <td>${joke.topic}</td>
+        <td>${jokePreview}</td>
+      </tr>`;
+    }).join('');
+    
+    res.send(renderTemplate('recent_jokes', { jokes_rows: jokesRows }));
+  } catch (error) {
+    console.error('Error fetching recent jokes:', error);
+    res.send(renderTemplate('error', { message: 'Sorry, I couldn\'t load the recent jokes right now.' }));
+  }
+});
 
 function getOrCreateConversation(sessionId) {
   if (!conversations.has(sessionId)) {
