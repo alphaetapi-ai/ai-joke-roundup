@@ -1,0 +1,12 @@
+<% jokes.forEach(function(joke) { %>
+    <tr>
+        <td><%= joke.date_created %></td>
+        <td><%= useCompact ? joke.topic_preview : joke.topic %></td>
+        <td>
+            <div class="tooltip">
+                <a href="/joke/<%= joke.joke_id %>"><%= useCompact ? joke.joke_preview : joke.preview %></a>
+                <span class="tooltiptext"><%= joke.joke_content %></span>
+            </div>
+        </td>
+    </tr>
+<% }); %>

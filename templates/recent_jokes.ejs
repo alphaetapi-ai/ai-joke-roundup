@@ -19,18 +19,7 @@
             </tr>
         </thead>
         <tbody>
-            <% jokes.forEach(function(joke) { %>
-                <tr>
-                    <td><%= joke.date_created %></td>
-                    <td><%= joke.topic %></td>
-                    <td>
-                        <div class="tooltip">
-                            <a href="/joke/<%= joke.joke_id %>"><%= joke.preview %></a>
-                            <span class="tooltiptext"><%= joke.joke_content %></span>
-                        </div>
-                    </td>
-                </tr>
-            <% }); %>
+            <%- include('_joke_table_rows', { jokes: jokes, useCompact: false }) %>
         </tbody>
     </table>
 </body>
