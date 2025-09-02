@@ -8,20 +8,21 @@ body {
 
 /* Two-column layout */
 .container {
-    display: flex;
-    gap: 40px;
-    align-items: flex-start;
+    overflow: hidden; /* Clear floats */
 }
 
-.left-column, .right-column {
-    flex: 1;
+.left-column {
     text-align: center;
 }
 
 .right-column {
+    float: right;
+    width: 33.33%;
     background-color: #f9f9f9;
     padding: 20px;
     border-radius: 8px;
+    text-align: center;
+    margin-left: 20px;
 }
 
 /* Form elements */
