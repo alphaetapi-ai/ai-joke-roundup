@@ -31,9 +31,24 @@ else
     exit 1
 fi
 
+# Insert default model data
+echo "Adding default model data..."
+mysql -u joke_user -p'joke_pass' joke_generator -e "
+INSERT INTO models (model_name) VALUES ('llama3.2:latest');
+INSERT INTO models (model_name) VALUES ('claude-3-haiku-20240307');
+"
+
+if [ $? -eq 0 ]; then
+    echo "Default model data added successfully."
+else
+    echo "Error adding default model data."
+    exit 1
+fi
+
 # Verify setup
 echo "Verifying database setup..."
 mysql -u joke_user -p'joke_pass' joke_generator -e "SHOW TABLES;"
+mysql -u joke_user -p'joke_pass' joke_generator -e "SELECT * FROM models;"
 
 if [ $? -eq 0 ]; then
     echo "Database setup completed successfully!"

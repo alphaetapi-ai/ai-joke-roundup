@@ -72,12 +72,12 @@ async function findOrCreateTopic(topicText) {
   }
 }
 
-async function storeJoke(topicId, type, jokeContent, explanation) {
+async function storeJoke(topicId, modelId, type, jokeContent, explanation) {
   const connection = await mysql.createConnection(dbConfig);
   try {
     const [result] = await connection.execute(
-      'INSERT INTO jokes (topic_id, type, joke_content, explanation) VALUES (?, ?, ?, ?)',
-      [topicId, type, jokeContent, explanation]
+      'INSERT INTO jokes (topic_id, model_id, type, joke_content, explanation) VALUES (?, ?, ?, ?, ?)',
+      [topicId, modelId, type, jokeContent, explanation]
     );
     
     return result.insertId;
@@ -143,6 +143,31 @@ async function getRecentJokesCompact(limit = 20) {
         joke_preview: jokePreview
       };
     });
+  } finally {
+    await connection.end();
+  }
+}
+
+async function findOrCreateModel(modelName) {
+  const connection = await mysql.createConnection(dbConfig);
+  try {
+    // Try to find existing model
+    const [rows] = await connection.execute(
+      'SELECT model_id FROM models WHERE model_name = ?',
+      [modelName]
+    );
+    
+    if (rows.length > 0) {
+      return rows[0].model_id;
+    }
+    
+    // Create new model if not found
+    const [result] = await connection.execute(
+      'INSERT INTO models (model_name) VALUES (?)',
+      [modelName]
+    );
+    
+    return result.insertId;
   } finally {
     await connection.end();
   }
@@ -319,7 +344,12 @@ app.post('/get_joke', async (req, res) => {
     // Store the joke in the database
     try {
       const topicId = await findOrCreateTopic(topic);
-      await storeJoke(topicId, style, joke, explanation);
+      
+      // Get the correct model name based on which provider we're using
+      const modelName = USE_ANTHROPIC ? 'claude-3-haiku-20240307' : 'llama3.2:latest';
+      const modelId = await findOrCreateModel(modelName);
+      
+      await storeJoke(topicId, modelId, style, joke, explanation);
     } catch (dbError) {
       console.error('Database error:', dbError);
       // Continue serving the joke even if database storage fails
