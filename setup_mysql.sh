@@ -36,6 +36,7 @@ echo "Adding default model data..."
 mysql -u joke_user -p'joke_pass' joke_generator -e "
 INSERT INTO models (model_name) VALUES ('llama3.2:latest');
 INSERT INTO models (model_name) VALUES ('claude-3-haiku-20240307');
+INSERT INTO models (model_name) VALUES ('llama-3.1-70b-versatile');
 "
 
 if [ $? -eq 0 ]; then

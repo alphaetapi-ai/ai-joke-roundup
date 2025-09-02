@@ -1,6 +1,7 @@
 import express from 'express';
 import { Ollama } from '@langchain/community/llms/ollama';
 import { ChatAnthropic } from '@langchain/anthropic';
+import { ChatGroq } from '@langchain/groq';
 import { ConversationChain } from 'langchain/chains';
 import { BufferMemory } from 'langchain/memory';
 import mysql from 'mysql2/promise';
@@ -32,8 +33,17 @@ const dbConfig = {
 // const USE_ANTHROPIC = process.env.ANTHROPIC_API_KEY ? true : false;
 const USE_ANTHROPIC = false; // Temporarily hard-coded to use Ollama
 
-// Initialize LLM (either Anthropic or Ollama)
-const llm = USE_ANTHROPIC ? 
+// Determine which LLM provider to use (priority: Groq > Anthropic > Ollama)
+const USE_GROQ = process.env.GROQ_API_KEY ? true : false;
+
+// Initialize LLM (Groq, Anthropic, or Ollama)
+const llm = USE_GROQ ? 
+  new ChatGroq({
+    apiKey: process.env.GROQ_API_KEY,
+    model: 'llama-3.1-8b-instant',
+    temperature: 0.7,
+  }) :
+  USE_ANTHROPIC ? 
   new ChatAnthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
     model: 'claude-3-haiku-20240307',
@@ -349,7 +359,9 @@ app.post('/get_joke', async (req, res) => {
       const topicId = await findOrCreateTopic(topic);
       
       // Get the correct model name based on which provider we're using
-      const modelName = USE_ANTHROPIC ? 'claude-3-haiku-20240307' : 'llama3.2:latest';
+      const modelName = USE_GROQ ? 'llama-3.1-8b-instant' :
+                        USE_ANTHROPIC ? 'claude-3-haiku-20240307' : 
+                        'llama3.2:latest';
       const modelId = await findOrCreateModel(modelName);
       
       await storeJoke(topicId, modelId, style, joke, explanation);
