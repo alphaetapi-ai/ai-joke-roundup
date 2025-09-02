@@ -7,6 +7,8 @@ import { BufferMemory } from 'langchain/memory';
 import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
 import natural from 'natural';
+import cookieParser from 'cookie-parser';
+import crypto from 'crypto';
 
 // Load environment variables
 dotenv.config();
@@ -69,6 +71,28 @@ async function updateStemTopicVisibility(stemTopicId, visible) {
   } finally {
     await connection.end();
   }
+}
+
+// Function to generate visitor nonce
+function generateVisitorNonce() {
+  return crypto.randomBytes(16).toString('hex');
+}
+
+// Middleware to ensure visitor has a unique identifier
+function ensureVisitorCookie(req, res, next) {
+  if (!req.cookies.visitor_id) {
+    const visitorId = generateVisitorNonce();
+    res.cookie('visitor_id', visitorId, {
+      maxAge: 365 * 24 * 60 * 60 * 1000, // 1 year
+      httpOnly: true,
+      secure: false, // Set to true in production with HTTPS
+      sameSite: 'lax'
+    });
+    req.visitor_id = visitorId;
+  } else {
+    req.visitor_id = req.cookies.visitor_id;
+  }
+  next();
 }
 
 // Text processing function to generate stemmed topics
@@ -255,7 +279,7 @@ async function findOrCreateModel(modelName) {
   }
 }
 
-async function getJokeById(jokeId) {
+async function getJokeById(jokeId, visitorId = null) {
   const connection = await mysql.createConnection(dbConfig);
   try {
     const [rows] = await connection.execute(
@@ -267,16 +291,37 @@ async function getJokeById(jokeId) {
       [jokeId]
     );
     
-    return rows.length > 0 ? rows[0] : null;
+    if (rows.length === 0) {
+      return null;
+    }
+    
+    const joke = rows[0];
+    
+    // If visitor ID provided, check for existing vote
+    if (visitorId) {
+      const [voteRows] = await connection.execute(
+        'SELECT rating FROM joke_votes WHERE joke_id = ? AND visitor_string = ? AND vote_date = CURDATE()',
+        [jokeId, visitorId]
+      );
+      
+      joke.user_vote = voteRows.length > 0 ? voteRows[0].rating : null;
+    }
+    
+    return joke;
   } finally {
     await connection.end();
   }
 }
 
 app.use(express.urlencoded({ extended: true }));
+app.use(express.json()); // Add JSON parsing for vote endpoint
 app.use(express.static('public'));
+app.use(cookieParser());
 
 // EJS templating is now configured and handled by Express
+
+// Apply visitor cookie middleware to all routes
+app.use(ensureVisitorCookie);
 
 // Index page with recent jokes
 app.get('/', async (req, res) => {
@@ -330,18 +375,20 @@ app.get('/joke/:id', async (req, res) => {
       return res.render('error', { message: 'Invalid joke ID.' });
     }
     
-    const joke = await getJokeById(jokeId);
+    const joke = await getJokeById(jokeId, req.visitor_id);
     if (!joke) {
       return res.render('error', { message: 'Joke not found.' });
     }
     
     res.render('joke_detail', {
+      joke_id: jokeId,
       topic: joke.topic,
       type: joke.type.charAt(0).toUpperCase() + joke.type.slice(1), // Capitalize first letter
       date_created: joke.date_created,
       joke_content: joke.joke_content,
       explanation: joke.explanation,
-      model_name: joke.model_name
+      model_name: joke.model_name,
+      user_vote: joke.user_vote
     });
   } catch (error) {
     console.error('Error fetching joke:', error);
@@ -493,6 +540,102 @@ app.post('/get_joke', async (req, res) => {
     });
   } catch (error) {
     res.render('error', { message: 'Sorry, I couldn\'t generate a joke right now. Make sure Ollama is running!' });
+  }
+});
+
+// Vote endpoint for joke rating
+app.post('/vote', async (req, res) => {
+  const { joke_id, rating } = req.body;
+  const visitorId = req.visitor_id;
+  
+  // Validate input
+  if (!joke_id || !rating || !['funny', 'okay', 'dud'].includes(rating)) {
+    return res.status(400).json({ message: 'Invalid vote data' });
+  }
+  
+  const connection = await mysql.createConnection(dbConfig);
+  
+  try {
+    await connection.beginTransaction();
+    
+    // Try to insert the vote
+    try {
+      await connection.execute(
+        'INSERT INTO joke_votes (joke_id, visitor_string, rating) VALUES (?, ?, ?)',
+        [joke_id, visitorId, rating]
+      );
+      
+      // Vote inserted successfully - increment the corresponding counter
+      const ratingColumn = `rating_${rating}`;
+      await connection.execute(
+        `UPDATE jokes SET ${ratingColumn} = ${ratingColumn} + 1 WHERE joke_id = ?`,
+        [joke_id]
+      );
+      
+      await connection.commit();
+      res.json({ message: `Vote recorded: ${rating}` });
+      
+    } catch (insertError) {
+      if (insertError.code === 'ER_DUP_ENTRY') {
+        // Vote already exists - remove it and decrement counter
+        
+        // First, get the existing vote to know which counter to decrement
+        const [existingVotes] = await connection.execute(
+          'SELECT rating FROM joke_votes WHERE joke_id = ? AND visitor_string = ? AND vote_date = CURDATE()',
+          [joke_id, visitorId]
+        );
+        
+        if (existingVotes.length > 0) {
+          const existingRating = existingVotes[0].rating;
+          
+          // Remove the existing vote
+          await connection.execute(
+            'DELETE FROM joke_votes WHERE joke_id = ? AND visitor_string = ? AND vote_date = CURDATE()',
+            [joke_id, visitorId]
+          );
+          
+          // Decrement the corresponding counter
+          const existingRatingColumn = `rating_${existingRating}`;
+          await connection.execute(
+            `UPDATE jokes SET ${existingRatingColumn} = ${existingRatingColumn} - 1 WHERE joke_id = ?`,
+            [joke_id]
+          );
+          
+          // If the new vote is different from the existing one, add the new vote
+          if (rating !== existingRating) {
+            await connection.execute(
+              'INSERT INTO joke_votes (joke_id, visitor_string, rating) VALUES (?, ?, ?)',
+              [joke_id, visitorId, rating]
+            );
+            
+            // Increment the new counter
+            const newRatingColumn = `rating_${rating}`;
+            await connection.execute(
+              `UPDATE jokes SET ${newRatingColumn} = ${newRatingColumn} + 1 WHERE joke_id = ?`,
+              [joke_id]
+            );
+            
+            await connection.commit();
+            res.json({ message: `Vote changed from ${existingRating} to ${rating}` });
+          } else {
+            await connection.commit();
+            res.json({ message: `Vote removed: ${rating}` });
+          }
+        } else {
+          await connection.rollback();
+          res.status(400).json({ message: 'Vote conflict - please try again' });
+        }
+      } else {
+        throw insertError;
+      }
+    }
+    
+  } catch (error) {
+    await connection.rollback();
+    console.error('Vote error:', error);
+    res.status(500).json({ message: 'Error processing vote' });
+  } finally {
+    await connection.end();
   }
 });
 
