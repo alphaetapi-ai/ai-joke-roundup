@@ -4,6 +4,11 @@ import { join } from 'path';
 import { Ollama } from '@langchain/community/llms/ollama';
 import { ConversationChain } from 'langchain/chains';
 import { BufferMemory } from 'langchain/memory';
+import mysql from 'mysql2/promise';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 const app = express();
 const port = 3000;
@@ -11,6 +16,14 @@ const port = 3000;
 // Response size limits
 const JOKE_LIMIT = 1024;
 const EXPLANATION_LIMIT = 1024;
+
+// MySQL connection configuration
+const dbConfig = {
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_DATABASE
+};
 
 // Initialize LangChain with Ollama
 const llm = new Ollama({
@@ -20,6 +33,46 @@ const llm = new Ollama({
 
 // Store conversation history by session (in production, use a proper database)
 const conversations = new Map();
+
+// Database helper functions
+async function findOrCreateTopic(topicText) {
+  const connection = await mysql.createConnection(dbConfig);
+  try {
+    // Try to find existing topic
+    const [rows] = await connection.execute(
+      'SELECT topic_id FROM topics WHERE topic = ?',
+      [topicText]
+    );
+    
+    if (rows.length > 0) {
+      return rows[0].topic_id;
+    }
+    
+    // Create new topic if not found
+    const [result] = await connection.execute(
+      'INSERT INTO topics (topic) VALUES (?)',
+      [topicText]
+    );
+    
+    return result.insertId;
+  } finally {
+    await connection.end();
+  }
+}
+
+async function storeJoke(topicId, type, jokeContent, explanation) {
+  const connection = await mysql.createConnection(dbConfig);
+  try {
+    const [result] = await connection.execute(
+      'INSERT INTO jokes (topic_id, type, joke_content, explanation) VALUES (?, ?, ?, ?)',
+      [topicId, type, jokeContent, explanation]
+    );
+    
+    return result.insertId;
+  } finally {
+    await connection.end();
+  }
+}
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
@@ -117,6 +170,15 @@ app.post('/get_joke', async (req, res) => {
       }
       
       explanation = explanation.substring(0, truncateAt) + '...';
+    }
+
+    // Store the joke in the database
+    try {
+      const topicId = await findOrCreateTopic(topic);
+      await storeJoke(topicId, style, joke, explanation);
+    } catch (dbError) {
+      console.error('Database error:', dbError);
+      // Continue serving the joke even if database storage fails
     }
 
     res.send(renderTemplate('joke', { 

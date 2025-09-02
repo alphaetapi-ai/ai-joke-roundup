@@ -13,8 +13,10 @@
   "dependencies": {
     "@langchain/community": "^0.3.53",
     "@langchain/core": "^0.3.72",
+    "dotenv": "^17.2.1",
     "express": "^5.1.0",
     "langchain": "^0.3.31",
+    "mysql2": "^3.14.4",
     "node-fetch": "^3.3.2"
   }
 }
