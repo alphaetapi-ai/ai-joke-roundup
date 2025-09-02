@@ -23,7 +23,12 @@
                 <tr>
                     <td><%= joke.date_created %></td>
                     <td><%= joke.topic %></td>
-                    <td><a href="/joke/<%= joke.joke_id %>"><%= joke.preview %></a></td>
+                    <td>
+                        <div class="tooltip">
+                            <a href="/joke/<%= joke.joke_id %>"><%= joke.preview %></a>
+                            <span class="tooltiptext"><%= joke.joke_content %></span>
+                        </div>
+                    </td>
                 </tr>
             <% }); %>
         </tbody>
