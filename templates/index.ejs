@@ -33,7 +33,29 @@
         </div>
         <div class="right-column">
             <h2>Recent Jokes</h2>
-            <p>PLACEHOLDER FOR JOKE LIST</p>
+            <% if (recentJokes.length > 0) { %>
+                <table class="compact-jokes-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Topic</th>
+                            <th>Preview</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% recentJokes.forEach(function(joke) { %>
+                            <tr>
+                                <td><%= joke.date_created %></td>
+                                <td><%= joke.topic_preview %></td>
+                                <td><a href="/joke/<%= joke.joke_id %>"><%= joke.joke_preview %></a></td>
+                            </tr>
+                        <% }); %>
+                    </tbody>
+                </table>
+            <% } else { %>
+                <p>No jokes yet. Generate your first joke!</p>
+            <% } %>
+            <p><a href="/recent_jokes">View All Recent Jokes →</a></p>
         </div>
     </div>
 </body>

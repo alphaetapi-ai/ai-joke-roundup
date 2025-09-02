@@ -93,6 +93,51 @@ async function getRecentJokes(limit = 50) {
   }
 }
 
+async function getRecentJokesCompact(limit = 20) {
+  const connection = await mysql.createConnection(dbConfig);
+  try {
+    const [rows] = await connection.execute(
+      `SELECT j.joke_id, j.joke_content, DATE_FORMAT(j.date_created, '%Y-%b-%d') as date_created, t.topic 
+       FROM jokes j 
+       JOIN topics t ON j.topic_id = t.topic_id 
+       ORDER BY j.date_created DESC, j.joke_id DESC 
+       LIMIT ${parseInt(limit)}`
+    );
+    
+    // Process with compact truncation limits
+    return rows.map(joke => {
+      let topicPreview = joke.topic;
+      let jokePreview = joke.joke_content;
+      
+      // Truncate topic to 32 bytes
+      if (Buffer.byteLength(topicPreview, 'utf8') > 32) {
+        let truncateAt = 29; // 32 - 3 bytes for '...'
+        while (truncateAt > 0 && Buffer.byteLength(topicPreview.substring(0, truncateAt), 'utf8') > 29) {
+          truncateAt--;
+        }
+        topicPreview = topicPreview.substring(0, truncateAt) + '...';
+      }
+      
+      // Truncate joke to 64 bytes
+      if (Buffer.byteLength(jokePreview, 'utf8') > 64) {
+        let truncateAt = 61; // 64 - 3 bytes for '...'
+        while (truncateAt > 0 && Buffer.byteLength(jokePreview.substring(0, truncateAt), 'utf8') > 61) {
+          truncateAt--;
+        }
+        jokePreview = jokePreview.substring(0, truncateAt) + '...';
+      }
+      
+      return {
+        ...joke,
+        topic_preview: topicPreview,
+        joke_preview: jokePreview
+      };
+    });
+  } finally {
+    await connection.end();
+  }
+}
+
 async function getJokeById(jokeId) {
   const connection = await mysql.createConnection(dbConfig);
   try {
@@ -115,7 +160,17 @@ app.use(express.static('public'));
 
 // EJS templating is now configured and handled by Express
 
-// Static files (index.html) are now served by express.static
+// Index page with recent jokes
+app.get('/', async (req, res) => {
+  try {
+    const recentJokes = await getRecentJokesCompact(20);
+    res.render('index', { recentJokes });
+  } catch (error) {
+    console.error('Error fetching recent jokes for index:', error);
+    // Render index without jokes if database fails
+    res.render('index', { recentJokes: [] });
+  }
+});
 
 app.get('/recent_jokes', async (req, res) => {
   try {

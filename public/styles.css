@@ -144,3 +144,43 @@ a:hover {
 .jokes-table td:nth-child(3) {
     width: 65%;
 }
+
+/* Compact jokes table styles for index page */
+.compact-jokes-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 15px 0;
+    font-size: 12px;
+}
+
+.compact-jokes-table th,
+.compact-jokes-table td {
+    padding: 6px 8px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.compact-jokes-table th {
+    background-color: #f2f2f2;
+    font-weight: bold;
+    font-size: 11px;
+}
+
+.compact-jokes-table tr:hover {
+    background-color: #f5f5f5;
+}
+
+.compact-jokes-table th:nth-child(1),
+.compact-jokes-table td:nth-child(1) {
+    width: 20%;
+}
+
+.compact-jokes-table th:nth-child(2),
+.compact-jokes-table td:nth-child(2) {
+    width: 25%;
+}
+
+.compact-jokes-table th:nth-child(3),
+.compact-jokes-table td:nth-child(3) {
+    width: 55%;
+}
