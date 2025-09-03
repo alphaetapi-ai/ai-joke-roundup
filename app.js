@@ -426,7 +426,7 @@ app.post('/get_joke', async (req, res) => {
     if (stemTopicInfo.isNew) {
       const conversation = getOrCreateConversation(req.ip + '_content_filter');
       
-      const filterPrompt = `You must answer with only "YES" or "NO" - no other text. Is this topic appropriate for family-friendly workplace humor? Only answer NO if the topic involves explicit sexual content, graphic violence, hate speech, or profanity: ${topic}`;
+      const filterPrompt = `Answer only "YES" or "NO". Look at this exact word or phrase: "${topic}". Does this word/phrase itself literally contain explicit sexual words, graphic violence words, hate speech, profanity, or slurs? Only look at the actual letters and words, not what the concept might involve. Answer YES if safe, NO if it contains actual bad words: ${topic}`;
       
       try {
         console.log(`\n=== AI Content Filter Debug ===`);
@@ -445,14 +445,28 @@ app.post('/get_joke', async (req, res) => {
         console.log(`Contains 'yes': ${aiAnswer.includes('yes')}`);
         console.log(`Contains 'n' (without 'yes'): ${!aiAnswer.includes('yes') && aiAnswer.includes('n')}`);
         
-        if (aiAnswer.includes('no') || (!aiAnswer.includes('yes') && aiAnswer.includes('n'))) {
-          // Topic is not family friendly - mark as invisible
-          console.log(`🚫 BLOCKING topic "${topic}" based on AI response`);
+        // The question asks: "Does X contain bad content?" 
+        // NO means "it does NOT contain bad content" = ALLOW
+        // YES means "it DOES contain bad content" = BLOCK
+        if (aiAnswer.includes('yes')) {
+          // Ask follow-up question to understand why
+          try {
+            console.log(`❓ Asking AI to explain why "${topic}" was blocked...`);
+            const explainResponse = await conversation.call({
+              input: `Why did you answer YES to that question about "${topic}"? What inappropriate content did you detect?`
+            });
+            console.log(`AI Explanation: "${explainResponse.response}"`);
+          } catch (explainError) {
+            console.error('Error getting AI explanation:', explainError);
+          }
+          
+          // Topic contains inappropriate content - mark as invisible
+          console.log(`🚫 BLOCKING topic "${topic}" - AI detected inappropriate content`);
           console.log(`=== End Debug ===\n`);
           await updateStemTopicVisibility(stemTopicInfo.stem_topic_id, false);
           return res.render('error', { message: 'Let\'s keep this safe for work and family friendly, please.' });
         } else {
-          console.log(`✅ ALLOWING topic "${topic}"`);
+          console.log(`✅ ALLOWING topic "${topic}" - AI says no inappropriate content detected`);
           console.log(`=== End Debug ===\n`);
         }
         // If "yes" or unclear, proceed normally (stem topic remains visible = true)
