@@ -426,7 +426,7 @@ app.post('/get_joke', async (req, res) => {
     if (stemTopicInfo.isNew) {
       const conversation = getOrCreateConversation(req.ip + '_content_filter');
       
-      const filterPrompt = `Answer only "YES" or "NO". Look at this exact word or phrase: "${topic}". Does this word/phrase itself literally contain explicit sexual words, graphic violence words, hate speech, profanity, or slurs? Only look at the actual letters and words, not what the concept might involve. Answer YES if safe, NO if it contains actual bad words: ${topic}`;
+      const filterPrompt = `Answer only "YES" or "NO". Look at this exact word or phrase: "${topic}". Is this topic appropriate for family-friendly workplace humor? Consider if it contains explicit sexual words, graphic violence words, hate speech, profanity, or slurs. Answer YES if appropriate and safe, NO if inappropriate: ${topic}`;
       
       try {
         console.log(`\n=== AI Content Filter Debug ===`);
@@ -445,15 +445,15 @@ app.post('/get_joke', async (req, res) => {
         console.log(`Contains 'yes': ${aiAnswer.includes('yes')}`);
         console.log(`Contains 'n' (without 'yes'): ${!aiAnswer.includes('yes') && aiAnswer.includes('n')}`);
         
-        // The question asks: "Does X contain bad content?" 
-        // NO means "it does NOT contain bad content" = ALLOW
-        // YES means "it DOES contain bad content" = BLOCK
-        if (aiAnswer.includes('yes')) {
+        // The question asks: "Is X appropriate?" 
+        // YES means "it IS appropriate" = ALLOW
+        // NO means "it is NOT appropriate" = BLOCK
+        if (aiAnswer.includes('no')) {
           // Ask follow-up question to understand why
           try {
             console.log(`❓ Asking AI to explain why "${topic}" was blocked...`);
             const explainResponse = await conversation.call({
-              input: `Why did you answer YES to that question about "${topic}"? What inappropriate content did you detect?`
+              input: `Why did you answer NO to that question about "${topic}"? What inappropriate content did you detect?`
             });
             console.log(`AI Explanation: "${explainResponse.response}"`);
           } catch (explainError) {
