@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Blocked Topics</title>
+    <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+    <%- include('_header') %>
+    <div class="page-layout">
+        <div class="generator-form">
+            <h1>Admin - Blocked Topics Management</h1>
+            
+            <% if (blockedTopics.length > 0) { %>
+                <p>Found <%= blockedTopics.length %> blocked topic<%= blockedTopics.length === 1 ? '' : 's' %>:</p>
+                
+                <form action="/admin/clear-blocked" method="POST" style="margin: 20px 0;">
+                    <button type="submit" onclick="return confirm('Are you sure you want to clear all blocked topics? This cannot be undone.')">
+                        Clear Blocked Topics
+                    </button>
+                </form>
+                
+                <table class="jokes-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Topic Example</th>
+                            <th>Stemmed Topic</th>
+                            <th>ID</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% blockedTopics.forEach(function(topic) { %>
+                            <tr>
+                                <td><%= topic.date_suggested %></td>
+                                <td><%= topic.topic_example %></td>
+                                <td><%= topic.topic_stemmed %></td>
+                                <td><%= topic.stem_topic_id %></td>
+                            </tr>
+                        <% }); %>
+                    </tbody>
+                </table>
+            <% } else { %>
+                <p>No blocked topics found.</p>
+                <button disabled style="opacity: 0.5;">Clear Blocked Topics</button>
+                <p><em>All topics are currently allowed.</em></p>
+            <% } %>
+            
+            <p style="margin-top: 40px;"><a href="/">← Back to Joke Generator</a></p>
+        </div>
+    </div>
+</body>
+</html>

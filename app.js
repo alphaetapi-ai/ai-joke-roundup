@@ -380,6 +380,34 @@ async function getJokeById(jokeId, visitorId = null) {
   }
 }
 
+// Admin functions
+async function getBlockedTopics() {
+  const connection = await mysql.createConnection(dbConfig);
+  try {
+    const [rows] = await connection.execute(
+      `SELECT stem_topic_id, topic_example, topic_stemmed, DATE_FORMAT(date_suggested, '%Y-%b-%d') as date_suggested
+       FROM stem_topic 
+       WHERE visible = 0 
+       ORDER BY date_suggested DESC, stem_topic_id DESC`
+    );
+    return rows;
+  } finally {
+    await connection.end();
+  }
+}
+
+async function clearBlockedTopics() {
+  const connection = await mysql.createConnection(dbConfig);
+  try {
+    const [result] = await connection.execute(
+      'DELETE FROM stem_topic WHERE visible = 0'
+    );
+    return result.affectedRows;
+  } finally {
+    await connection.end();
+  }
+}
+
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json()); // Add JSON parsing for vote endpoint
 app.use(express.static('public'));
@@ -554,6 +582,7 @@ Classification for "${topic}": `;
           console.log(`🚫 BLOCKING topic "${topic}" - AI detected offensive words`);
           console.log(`=== End Debug ===\n`);
           await updateStemTopicVisibility(stemTopicInfo.stem_topic_id, false);
+          console.log(`🚫 Topic visibility updated and RETURNING ERROR PAGE - should not generate joke`);
           return res.render('error', { message: 'Let\'s keep this safe for work and family friendly, please.' });
         } else if (aiAnswer.includes('clean')) {
           console.log(`✅ ALLOWING topic "${topic}" - AI classified as CLEAN`);
@@ -572,6 +601,7 @@ Classification for "${topic}": `;
       }
     } else if (!stemTopicInfo.visible) {
       // Existing stem topic that's already marked as not visible
+      console.log(`🚫 BLOCKING topic "${topic}" - stem topic already marked as not visible`);
       return res.render('error', { message: 'Let\'s keep this safe for work and family friendly, please.' });
     }
   } catch (error) {
@@ -581,6 +611,8 @@ Classification for "${topic}": `;
   
   // Simple session ID - in production, use proper session management
   const sessionId = req.ip + Date.now();
+  
+  console.log(`✅ PROCEEDING TO JOKE GENERATION for topic "${topic}"`);
   
   try {
     const conversation = getOrCreateConversation(sessionId);
@@ -756,6 +788,28 @@ app.post('/vote', async (req, res) => {
     res.status(500).json({ message: 'Error processing vote' });
   } finally {
     await connection.end();
+  }
+});
+
+// Admin routes
+app.get('/admin', async (req, res) => {
+  try {
+    const blockedTopics = await getBlockedTopics();
+    res.render('admin', { blockedTopics: blockedTopics });
+  } catch (error) {
+    console.error('Error loading admin page:', error);
+    res.status(500).render('error', { message: 'Error loading admin page.' });
+  }
+});
+
+app.post('/admin/clear-blocked', async (req, res) => {
+  try {
+    const deletedCount = await clearBlockedTopics();
+    console.log(`Admin action: Cleared ${deletedCount} blocked topics`);
+    res.redirect('/admin');
+  } catch (error) {
+    console.error('Error clearing blocked topics:', error);
+    res.status(500).render('error', { message: 'Error clearing blocked topics.' });
   }
 });
 
