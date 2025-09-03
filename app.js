@@ -32,71 +32,93 @@ const dbConfig = {
   database: process.env.DB_DATABASE
 };
 
-// Environment detection - AWS vs Local
-const isAWS = process.env.NODE_ENV === 'production' || 
-              process.env.AWS_REGION || 
-              process.env.DB_HOST?.includes('amazonaws.com') || 
-              false;
+// Centralized LLM Configuration System
+class LLMConfig {
+  constructor() {
+    this.isAWS = process.env.NODE_ENV === 'production' || 
+                 process.env.AWS_REGION || 
+                 process.env.DB_HOST?.includes('amazonaws.com') || 
+                 false;
+    
+    this.providers = {
+      groq: {
+        name: 'Groq',
+        modelName: 'llama-3.1-8b-instant',
+        create: () => new ChatGroq({
+          apiKey: process.env.GROQ_API_KEY,
+          model: 'llama-3.1-8b-instant',
+          temperature: 0.7,
+        }),
+        available: () => !!process.env.GROQ_API_KEY
+      },
+      anthropic: {
+        name: 'Anthropic',
+        modelName: 'claude-3-haiku-20240307',
+        create: () => new ChatAnthropic({
+          apiKey: process.env.ANTHROPIC_API_KEY,
+          model: 'claude-3-haiku-20240307',
+          maxTokens: 1024,
+        }),
+        available: () => !!process.env.ANTHROPIC_API_KEY
+      },
+      ollama: {
+        name: 'Ollama',
+        modelName: 'llama3.2:latest',
+        create: () => new Ollama({
+          baseUrl: 'http://localhost:11434',
+          model: 'llama3.2:latest',
+        }),
+        available: () => !this.isAWS // Only available locally
+      }
+    };
 
-console.log(`Environment detected: ${isAWS ? 'AWS' : 'Local'}`);
+    this.initializeLLM();
+  }
 
-// LLM Provider selection logic
-let llm;
-let selectedProvider = 'unknown';
+  initializeLLM() {
+    console.log(`Environment detected: ${this.isAWS ? 'AWS' : 'Local'}`);
 
-if (isAWS) {
-  // On AWS: Use cloud-based LLMs only (Groq > Anthropic > OpenAI)
-  if (process.env.GROQ_API_KEY) {
-    llm = new ChatGroq({
-      apiKey: process.env.GROQ_API_KEY,
-      model: 'llama-3.1-8b-instant',
-      temperature: 0.7,
-    });
-    selectedProvider = 'Groq (AWS)';
-  } else if (process.env.ANTHROPIC_API_KEY) {
-    llm = new ChatAnthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
-      model: 'claude-3-haiku-20240307',
-      maxTokens: 1024,
-    });
-    selectedProvider = 'Anthropic (AWS)';
-  } else {
-    console.error('❌ No cloud LLM API keys found for AWS deployment!');
-    console.error('Set GROQ_API_KEY or ANTHROPIC_API_KEY environment variables.');
+    // Priority order: AWS uses cloud-only, Local prefers Ollama then cloud
+    const priority = this.isAWS 
+      ? ['groq', 'anthropic'] 
+      : ['ollama', 'groq', 'anthropic'];
+
+    for (const providerKey of priority) {
+      const provider = this.providers[providerKey];
+      
+      if (provider.available()) {
+        try {
+          this.llm = provider.create();
+          this.selectedProvider = provider.name;
+          this.modelName = provider.modelName;
+          this.providerKey = providerKey;
+          
+          console.log(`🤖 Using LLM: ${this.selectedProvider} (${this.isAWS ? 'AWS' : 'Local'})`);
+          return;
+        } catch (error) {
+          console.warn(`⚠️ Failed to initialize ${provider.name}:`, error.message);
+        }
+      }
+    }
+
+    // No LLM available
+    const errorMsg = this.isAWS 
+      ? '❌ No cloud LLM API keys found for AWS deployment! Set GROQ_API_KEY or ANTHROPIC_API_KEY.'
+      : '❌ No LLM available - install Ollama or set API keys';
+    
+    console.error(errorMsg);
     process.exit(1);
   }
-} else {
-  // Local development: Use local Ollama first, fallback to cloud APIs
-  try {
-    llm = new Ollama({
-      baseUrl: 'http://localhost:11434',
-      model: 'llama3.2:latest',
-    });
-    selectedProvider = 'Ollama (Local)';
-  } catch (error) {
-    console.warn('⚠️ Ollama not available locally, falling back to cloud APIs');
-    if (process.env.GROQ_API_KEY) {
-      llm = new ChatGroq({
-        apiKey: process.env.GROQ_API_KEY,
-        model: 'llama-3.1-8b-instant',
-        temperature: 0.7,
-      });
-      selectedProvider = 'Groq (Fallback)';
-    } else if (process.env.ANTHROPIC_API_KEY) {
-      llm = new ChatAnthropic({
-        apiKey: process.env.ANTHROPIC_API_KEY,
-        model: 'claude-3-haiku-20240307',
-        maxTokens: 1024,
-      });
-      selectedProvider = 'Anthropic (Fallback)';
-    } else {
-      console.error('❌ No LLM available - install Ollama or set API keys');
-      process.exit(1);
-    }
-  }
+
+  getLLM() { return this.llm; }
+  getModelName() { return this.modelName; }
+  getProviderName() { return this.selectedProvider; }
+  getProviderKey() { return this.providerKey; }
 }
 
-console.log(`🤖 Using LLM: ${selectedProvider}`);
+// Initialize centralized LLM configuration
+const llmConfig = new LLMConfig();
+const llm = llmConfig.getLLM();
 
 // Store conversation history by session (in production, use a proper database)
 const conversations = new Map();
@@ -593,10 +615,8 @@ app.post('/get_joke', async (req, res) => {
       const stemmedTopic = generateStemmedTopic(topic);
       const stemTopicInfo = await findOrCreateStemTopic(topic, stemmedTopic);
       
-      // Get the correct model name based on which provider we're using
-      const modelName = selectedProvider.includes('Groq') ? 'llama-3.1-8b-instant' :
-                        selectedProvider.includes('Anthropic') ? 'claude-3-haiku-20240307' : 
-                        'llama3.2:latest';
+      // Get the correct model name from centralized config
+      const modelName = llmConfig.getModelName();
       const modelId = await findOrCreateModel(modelName);
       
       jokeId = await storeJoke(topicId, modelId, stemTopicInfo.stem_topic_id, style, joke, explanation);
