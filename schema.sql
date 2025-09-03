@@ -1,14 +1,25 @@
 -- Joke Generator Database Schema
+-- Tables are ordered by dependency (no foreign key dependencies first)
 
--- Models table to store LLM model information
-CREATE TABLE models (
+-- Models table to store LLM model information (no dependencies)
+CREATE TABLE IF NOT EXISTS models (
     model_id INT AUTO_INCREMENT PRIMARY KEY,
     model_name VARCHAR(128) NOT NULL,
     UNIQUE KEY unique_model (model_name)
 );
 
--- Topics table to store unique topics
-CREATE TABLE topics (
+-- Stem topics table to store stemmed topic variations (no dependencies)
+CREATE TABLE IF NOT EXISTS stem_topic (
+    stem_topic_id INT AUTO_INCREMENT PRIMARY KEY,
+    topic_example VARCHAR(64) NOT NULL,
+    topic_stemmed VARCHAR(64) NOT NULL,
+    visible BOOLEAN DEFAULT TRUE,
+    date_suggested DATE DEFAULT (CURRENT_DATE),
+    UNIQUE KEY unique_stem (topic_stemmed)
+);
+
+-- Topics table to store unique topics (depends on stem_topic)
+CREATE TABLE IF NOT EXISTS topics (
     topic_id INT AUTO_INCREMENT PRIMARY KEY,
     topic VARCHAR(64) NOT NULL,
     stem_topic_id INT NOT NULL,
@@ -18,18 +29,8 @@ CREATE TABLE topics (
     INDEX idx_stem_topic_id (stem_topic_id)
 );
 
--- Stem topics table to store stemmed topic variations
-CREATE TABLE stem_topic (
-    stem_topic_id INT AUTO_INCREMENT PRIMARY KEY,
-    topic_example VARCHAR(64) NOT NULL,
-    topic_stemmed VARCHAR(64) NOT NULL,
-    visible BOOLEAN DEFAULT TRUE,
-    date_suggested DATE DEFAULT (CURRENT_DATE),
-    UNIQUE KEY unique_stem (topic_stemmed)
-);
-
--- Jokes table to store generated jokes
-CREATE TABLE jokes (
+-- Jokes table to store generated jokes (depends on topics, models, stem_topic)
+CREATE TABLE IF NOT EXISTS jokes (
     joke_id INT AUTO_INCREMENT PRIMARY KEY,
     topic_id INT NOT NULL,
     model_id INT NOT NULL,
@@ -51,8 +52,8 @@ CREATE TABLE jokes (
     INDEX idx_date_created (date_created)
 );
 
--- Joke votes table to track user ratings
-CREATE TABLE joke_votes (
+-- Joke votes table to track user ratings (depends on jokes)
+CREATE TABLE IF NOT EXISTS joke_votes (
     vote_id INT AUTO_INCREMENT PRIMARY KEY,
     joke_id INT NOT NULL,
     visitor_string VARCHAR(255) NOT NULL,
