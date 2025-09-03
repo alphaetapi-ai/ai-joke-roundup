@@ -408,6 +408,42 @@ async function clearBlockedTopics() {
   }
 }
 
+async function getHighestVotedJoke() {
+  const connection = await mysql.createConnection(dbConfig);
+  try {
+    // Calculate vote score as (funny - dud) / total_votes for jokes with votes
+    const [rows] = await connection.execute(
+      `SELECT j.joke_id, j.joke_content, t.topic,
+              j.rating_funny, j.rating_okay, j.rating_dud,
+              (j.rating_funny + j.rating_okay + j.rating_dud) as total_votes,
+              CASE 
+                WHEN (j.rating_funny + j.rating_okay + j.rating_dud) > 0 
+                THEN (j.rating_funny - j.rating_dud) / (j.rating_funny + j.rating_okay + j.rating_dud)
+                ELSE 0
+              END as vote_score
+       FROM jokes j 
+       JOIN topics t ON j.topic_id = t.topic_id 
+       WHERE (j.rating_funny + j.rating_okay + j.rating_dud) > 0
+       ORDER BY vote_score DESC, j.joke_id DESC`
+    );
+    
+    if (rows.length === 0) {
+      return null; // No jokes with votes
+    }
+    
+    // Find all jokes with the highest score
+    const highestScore = rows[0].vote_score;
+    const topJokes = rows.filter(joke => joke.vote_score === highestScore);
+    
+    // Return random joke from the winners
+    const randomIndex = Math.floor(Math.random() * topJokes.length);
+    return topJokes[randomIndex];
+    
+  } finally {
+    await connection.end();
+  }
+}
+
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json()); // Add JSON parsing for vote endpoint
 app.use(express.static('public'));
@@ -418,15 +454,18 @@ app.use(cookieParser());
 // Apply visitor cookie middleware to all routes
 app.use(ensureVisitorCookie);
 
-// Index page with recent jokes
+// Index page with recent jokes and highest voted joke
 app.get('/', async (req, res) => {
   try {
-    const recentJokes = await getRecentJokesCompact(20);
-    res.render('index', { recentJokes });
+    const [recentJokes, highestVotedJoke] = await Promise.all([
+      getRecentJokesCompact(20),
+      getHighestVotedJoke()
+    ]);
+    res.render('index', { recentJokes, highestVotedJoke });
   } catch (error) {
-    console.error('Error fetching recent jokes for index:', error);
-    // Render index without jokes if database fails
-    res.render('index', { recentJokes: [] });
+    console.error('Error fetching data for index:', error);
+    // Render index without data if database fails
+    res.render('index', { recentJokes: [], highestVotedJoke: null });
   }
 });
 

@@ -69,6 +69,11 @@ body::before {
     margin-left: 20px;
 }
 
+.highest-voted-section {
+    margin-top: 30px;
+    text-align: center;
+}
+
 /* Form elements */
 input[type="text"] {
     padding: 10px;
@@ -297,9 +302,14 @@ a:hover {
         width: 100%;
     }
     
-    /* Recent jokes list comes second visually */
-    .recent-list {
+    /* Highest voted section comes second on mobile */
+    .highest-voted-section {
         order: 2;
+    }
+    
+    /* Recent jokes list comes third visually */
+    .recent-list {
+        order: 3;
         float: none;
         width: 100%;
         margin-left: 0;

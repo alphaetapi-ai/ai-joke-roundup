@@ -53,6 +53,28 @@
                 <button type="submit">Tell me my joke</button>
             </form>
         </div>
+        
+        <!-- Highest Voted Joke Section - separate from the form -->
+        <div class="highest-voted-section">
+            <% if (highestVotedJoke) { %>
+                <div style="padding: 20px; background-color: #f0f8ff; border-radius: 8px; border: 2px solid #4CAF50;">
+                    <h3 style="margin-top: 0; color: #4CAF50;">🏆 Highest Voted Joke:</h3>
+                    <p style="font-style: italic; margin-bottom: 10px;">
+                        <%= highestVotedJoke.joke_content %>
+                    </p>
+                    <small style="color: #666;">
+                        Topic: <%= highestVotedJoke.topic %> | 
+                        Score: <%= Math.round(highestVotedJoke.vote_score * 100) %>% 
+                        (<%= highestVotedJoke.rating_funny %> funny, <%= highestVotedJoke.rating_okay %> okay, <%= highestVotedJoke.rating_dud %> dud)
+                    </small>
+                </div>
+            <% } else { %>
+                <div style="padding: 20px; background-color: #f9f9f9; border-radius: 8px;">
+                    <h3 style="margin-top: 0; color: #666;">🏆 Highest Voted Joke:</h3>
+                    <p style="color: #666; font-style: italic;">No jokes have been voted on yet. Be the first to vote!</p>
+                </div>
+            <% } %>
+        </div>
     </div>
 </body>
 </html>
