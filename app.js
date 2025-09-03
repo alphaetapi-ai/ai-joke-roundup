@@ -197,7 +197,8 @@ async function getRecentJokes(limit = 50) {
   try {
     const [rows] = await connection.execute(
       `SELECT j.joke_id, j.joke_content, j.type, DATE_FORMAT(j.date_created, '%Y-%b-%d') as date_created, t.topic,
-              (j.rating_funny - j.rating_dud) as net_rating
+              (j.rating_funny - j.rating_dud) as net_rating,
+              (j.rating_funny + j.rating_okay + j.rating_dud) as total_votes
        FROM jokes j 
        JOIN topics t ON j.topic_id = t.topic_id 
        ORDER BY j.date_created DESC, j.joke_id DESC 
@@ -215,7 +216,8 @@ async function getRecentJokesCompact(limit = 20) {
   try {
     const [rows] = await connection.execute(
       `SELECT j.joke_id, j.joke_content, DATE_FORMAT(j.date_created, '%Y-%b-%d') as date_created, t.topic,
-              (j.rating_funny - j.rating_dud) as net_rating
+              (j.rating_funny - j.rating_dud) as net_rating,
+              (j.rating_funny + j.rating_okay + j.rating_dud) as total_votes
        FROM jokes j 
        JOIN topics t ON j.topic_id = t.topic_id 
        ORDER BY j.date_created DESC, j.joke_id DESC 

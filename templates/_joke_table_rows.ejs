@@ -8,14 +8,21 @@
         <td style="text-align: center;">
             <% 
             let netRating = joke.net_rating || 0;
+            let totalVotes = joke.total_votes || 0;
             let color = 'black';
-            let displayValue = netRating.toString();
+            let displayValue;
             
-            if (netRating > 0) {
+            if (totalVotes === 0) {
+                displayValue = '-';
+                color = 'gray';
+            } else if (netRating > 0) {
                 color = 'green';
                 displayValue = '+' + netRating;
             } else if (netRating < 0) {
                 color = 'red';
+                displayValue = netRating.toString();
+            } else {
+                displayValue = '0';
             }
             %>
             <span style="color: <%= color %>; font-weight: bold;"><%= displayValue %></span>
