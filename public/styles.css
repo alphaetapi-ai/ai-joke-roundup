@@ -284,21 +284,27 @@ a:hover {
 
 /* Responsive design for mobile devices */
 @media screen and (max-width: 768px) {
-    /* Stack layout vertically on small screens */
+    /* Use flexbox to control order on mobile */
+    .container {
+        display: flex;
+        flex-direction: column;
+        padding: 10px;
+    }
+    
+    /* Form section comes first visually */
+    .left-column {
+        order: 1;
+        width: 100%;
+    }
+    
+    /* Recent jokes section comes second visually */
     .right-column {
+        order: 2;
         float: none;
         width: 100%;
         margin-left: 0;
         margin-top: 20px;
         clear: both;
-    }
-    
-    .left-column {
-        width: 100%;
-    }
-    
-    .container {
-        padding: 10px;
     }
     
     /* Make form inputs more mobile-friendly */
