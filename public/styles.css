@@ -72,6 +72,7 @@ body::before {
 .highest-voted-section {
     margin-top: 30px;
     text-align: center;
+    max-width: 60%;
 }
 
 /* Form elements */
@@ -305,6 +306,7 @@ a:hover {
     /* Highest voted section comes second on mobile */
     .highest-voted-section {
         order: 2;
+        max-width: none; /* Use full width on mobile */
     }
     
     /* Recent jokes list comes third visually */
