@@ -281,3 +281,46 @@ a:hover {
 .tooltip:hover .tooltiptext {
     visibility: visible;
 }
+
+/* Responsive design for mobile devices */
+@media screen and (max-width: 768px) {
+    /* Stack layout vertically on small screens */
+    .right-column {
+        float: none;
+        width: 100%;
+        margin-left: 0;
+        margin-top: 20px;
+        clear: both;
+    }
+    
+    .left-column {
+        width: 100%;
+    }
+    
+    .container {
+        padding: 10px;
+    }
+    
+    /* Make form inputs more mobile-friendly */
+    input[type="text"] {
+        width: 90%;
+        max-width: 300px;
+        margin: 10px 5px;
+    }
+    
+    /* Adjust site header for mobile */
+    .site-header {
+        font-size: 28px;
+        padding: 15px;
+    }
+    
+    /* Make tables more readable on mobile */
+    .compact-jokes-table {
+        font-size: 11px;
+    }
+    
+    .compact-jokes-table th,
+    .compact-jokes-table td {
+        padding: 4px 6px;
+    }
+}
