@@ -513,11 +513,27 @@ Classification for "${topic}": `;
           input: filterPrompt
         });
         
-        const aiAnswer = filterResponse.response.trim().toLowerCase();
+        let aiAnswer = filterResponse.response.trim().toLowerCase();
         console.log(`AI Raw Response: "${filterResponse.response}"`);
         console.log(`AI Lowercase: "${aiAnswer}"`);
         console.log(`Contains 'clean': ${aiAnswer.includes('clean')}`);
         console.log(`Contains 'offensive': ${aiAnswer.includes('offensive')}`);
+        
+        // Check if AI was verbose and included both terms
+        if (aiAnswer.includes('clean') && aiAnswer.includes('offensive')) {
+          console.log(`⚠️ AI gave verbose response with both terms - requesting clarification...`);
+          try {
+            const clarifyResponse = await conversation.call({
+              input: `You gave a verbose response. I need exactly ONE word only. For "${topic}": Answer only "CLEAN" or only "OFFENSIVE". Nothing else.`
+            });
+            aiAnswer = clarifyResponse.response.trim().toLowerCase();
+            console.log(`AI Clarification Response: "${clarifyResponse.response}"`);
+            console.log(`AI Clarification Lowercase: "${aiAnswer}"`);
+          } catch (clarifyError) {
+            console.error('Error getting AI clarification:', clarifyError);
+            // Keep original response if clarification fails
+          }
+        }
         
         // Parse the classification response format
         // "CLEAN" = ALLOW (words are clean)
