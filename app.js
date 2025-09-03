@@ -491,7 +491,17 @@ app.post('/get_joke', async (req, res) => {
     if (stemTopicInfo.isNew) {
       const conversation = getOrCreateConversation(req.ip + '_content_filter');
       
-      const filterPrompt = `Answer only "YES" or "NO". Look at this exact word or phrase: "${topic}". Are these words clean and appropriate? Ignore whether the topic might be sad or serious - only consider if the actual words themselves contain explicit sexual content, profanity, hate speech, slurs, or graphic violence terms. Answer YES if clean and appropriate, NO if the words contain offensive content: ${topic}`;
+      const filterPrompt = `CONTENT CLASSIFICATION TASK:
+
+Word to classify: "${topic}"
+
+Question: Does this word contain any explicit sexual words, profanity, hate speech, slurs, or graphic violence terms?
+
+Instructions:
+- If the word is CLEAN (like "apple", "scribbles", "happiness"), respond: "CLEAN"
+- If the word is OFFENSIVE (like curse words, slurs, explicit terms), respond: "OFFENSIVE"
+
+Classification for "${topic}": `;
       
       try {
         console.log(`\n=== AI Content Filter Debug ===`);
@@ -506,19 +516,18 @@ app.post('/get_joke', async (req, res) => {
         const aiAnswer = filterResponse.response.trim().toLowerCase();
         console.log(`AI Raw Response: "${filterResponse.response}"`);
         console.log(`AI Lowercase: "${aiAnswer}"`);
-        console.log(`Contains 'no': ${aiAnswer.includes('no')}`);
-        console.log(`Contains 'yes': ${aiAnswer.includes('yes')}`);
-        console.log(`Contains 'n' (without 'yes'): ${!aiAnswer.includes('yes') && aiAnswer.includes('n')}`);
+        console.log(`Contains 'clean': ${aiAnswer.includes('clean')}`);
+        console.log(`Contains 'offensive': ${aiAnswer.includes('offensive')}`);
         
-        // The question asks: "Are these words clean and appropriate?" 
-        // YES means "words are clean" = ALLOW
-        // NO means "words contain offensive content" = BLOCK
-        if (aiAnswer.includes('no')) {
+        // Parse the classification response format
+        // "CLEAN" = ALLOW (words are clean)
+        // "OFFENSIVE" = BLOCK (words contain offensive content)  
+        if (aiAnswer.includes('offensive')) {
           // Ask follow-up question to understand why
           try {
             console.log(`❓ Asking AI to explain why "${topic}" was blocked...`);
             const explainResponse = await conversation.call({
-              input: `Why did you answer NO to that question about "${topic}"? What offensive content did you detect in the phrase itself?`
+              input: `Why did you classify "${topic}" as OFFENSIVE? What explicit sexual words, profanity, hate speech, slurs, or graphic violence terms did you detect?`
             });
             console.log(`AI Explanation: "${explainResponse.response}"`);
           } catch (explainError) {
@@ -530,11 +539,17 @@ app.post('/get_joke', async (req, res) => {
           console.log(`=== End Debug ===\n`);
           await updateStemTopicVisibility(stemTopicInfo.stem_topic_id, false);
           return res.render('error', { message: 'Let\'s keep this safe for work and family friendly, please.' });
+        } else if (aiAnswer.includes('clean')) {
+          console.log(`✅ ALLOWING topic "${topic}" - AI classified as CLEAN`);
+          console.log(`=== End Debug ===\n`);
         } else {
-          console.log(`✅ ALLOWING topic "${topic}" - AI says words are clean`);
+          // Unexpected response format - log and proceed with caution
+          console.log(`⚠️ UNEXPECTED AI RESPONSE for topic "${topic}": "${filterResponse.response}"`);
+          console.log(`⚠️ Expected "CLEAN" or "OFFENSIVE", got: "${aiAnswer}"`);
+          console.log(`✅ ALLOWING by default (assuming clean due to unclear response)`);
           console.log(`=== End Debug ===\n`);
         }
-        // If "yes" or unclear, proceed normally (stem topic remains visible = true)
+        // If appropriate or unclear, proceed normally (stem topic remains visible = true)
       } catch (filterError) {
         console.error('Error filtering topic with AI:', filterError);
         // If filtering fails, proceed with caution but log the error
