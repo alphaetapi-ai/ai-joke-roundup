@@ -8,8 +8,8 @@
 </head>
 <body>
     <%- include('_header') %>
-    <div class="container">
-        <div class="right-column">
+    <div class="page-layout">
+        <div class="recent-list">
             <h2>Recent Jokes</h2>
             <% if (recentJokes.length > 0) { %>
                 <table class="compact-jokes-table">
@@ -30,7 +30,7 @@
             <% } %>
             <p><a href="/recent_jokes">View All Recent Jokes →</a></p>
         </div>
-        <div class="left-column">
+        <div class="generator-form">
             <h1>Joke Generator</h1>
             <p>What would you like your joke to be about?</p>
             <form action="/get_joke" method="POST">
