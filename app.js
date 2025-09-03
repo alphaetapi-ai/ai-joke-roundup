@@ -429,18 +429,31 @@ app.post('/get_joke', async (req, res) => {
       const filterPrompt = `You must answer with only "YES" or "NO" - no other text. Is this topic appropriate for family-friendly workplace humor? Only answer NO if the topic involves explicit sexual content, graphic violence, hate speech, or profanity: ${topic}`;
       
       try {
+        console.log(`\n=== AI Content Filter Debug ===`);
+        console.log(`Topic: "${topic}"`);
+        console.log(`Stemmed: "${stemmedTopic}"`);
+        console.log(`Prompt: "${filterPrompt}"`);
+        
         const filterResponse = await conversation.call({
           input: filterPrompt
         });
         
         const aiAnswer = filterResponse.response.trim().toLowerCase();
-        console.log(`AI Content Filter - Topic: "${topic}", AI Response: "${filterResponse.response}"`);
+        console.log(`AI Raw Response: "${filterResponse.response}"`);
+        console.log(`AI Lowercase: "${aiAnswer}"`);
+        console.log(`Contains 'no': ${aiAnswer.includes('no')}`);
+        console.log(`Contains 'yes': ${aiAnswer.includes('yes')}`);
+        console.log(`Contains 'n' (without 'yes'): ${!aiAnswer.includes('yes') && aiAnswer.includes('n')}`);
         
         if (aiAnswer.includes('no') || (!aiAnswer.includes('yes') && aiAnswer.includes('n'))) {
           // Topic is not family friendly - mark as invisible
-          console.log(`Blocking topic "${topic}" based on AI response: "${filterResponse.response}"`);
+          console.log(`🚫 BLOCKING topic "${topic}" based on AI response`);
+          console.log(`=== End Debug ===\n`);
           await updateStemTopicVisibility(stemTopicInfo.stem_topic_id, false);
           return res.render('error', { message: 'Let\'s keep this safe for work and family friendly, please.' });
+        } else {
+          console.log(`✅ ALLOWING topic "${topic}"`);
+          console.log(`=== End Debug ===\n`);
         }
         // If "yes" or unclear, proceed normally (stem topic remains visible = true)
       } catch (filterError) {
