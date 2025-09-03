@@ -426,7 +426,7 @@ app.post('/get_joke', async (req, res) => {
     if (stemTopicInfo.isNew) {
       const conversation = getOrCreateConversation(req.ip + '_content_filter');
       
-      const filterPrompt = `Answer only "YES" or "NO". Look at this exact word or phrase: "${topic}". Is this topic appropriate for family-friendly workplace humor? Consider if it contains explicit sexual words, graphic violence words, hate speech, profanity, or slurs. Answer YES if appropriate and safe, NO if inappropriate: ${topic}`;
+      const filterPrompt = `Answer only "YES" or "NO". Look at this exact word or phrase: "${topic}". Are these words clean and appropriate? Ignore whether the topic might be sad or serious - only consider if the actual words themselves contain explicit sexual content, profanity, hate speech, slurs, or graphic violence terms. Answer YES if clean and appropriate, NO if the words contain offensive content: ${topic}`;
       
       try {
         console.log(`\n=== AI Content Filter Debug ===`);
@@ -445,15 +445,15 @@ app.post('/get_joke', async (req, res) => {
         console.log(`Contains 'yes': ${aiAnswer.includes('yes')}`);
         console.log(`Contains 'n' (without 'yes'): ${!aiAnswer.includes('yes') && aiAnswer.includes('n')}`);
         
-        // The question asks: "Is X appropriate?" 
-        // YES means "it IS appropriate" = ALLOW
-        // NO means "it is NOT appropriate" = BLOCK
+        // The question asks: "Are these words clean and appropriate?" 
+        // YES means "words are clean" = ALLOW
+        // NO means "words contain offensive content" = BLOCK
         if (aiAnswer.includes('no')) {
           // Ask follow-up question to understand why
           try {
             console.log(`❓ Asking AI to explain why "${topic}" was blocked...`);
             const explainResponse = await conversation.call({
-              input: `Why did you answer NO to that question about "${topic}"? What inappropriate content did you detect?`
+              input: `Why did you answer NO to that question about "${topic}"? What offensive content did you detect in the phrase itself?`
             });
             console.log(`AI Explanation: "${explainResponse.response}"`);
           } catch (explainError) {
@@ -461,12 +461,12 @@ app.post('/get_joke', async (req, res) => {
           }
           
           // Topic contains inappropriate content - mark as invisible
-          console.log(`🚫 BLOCKING topic "${topic}" - AI detected inappropriate content`);
+          console.log(`🚫 BLOCKING topic "${topic}" - AI detected offensive words`);
           console.log(`=== End Debug ===\n`);
           await updateStemTopicVisibility(stemTopicInfo.stem_topic_id, false);
           return res.render('error', { message: 'Let\'s keep this safe for work and family friendly, please.' });
         } else {
-          console.log(`✅ ALLOWING topic "${topic}" - AI says no inappropriate content detected`);
+          console.log(`✅ ALLOWING topic "${topic}" - AI says words are clean`);
           console.log(`=== End Debug ===\n`);
         }
         // If "yes" or unclear, proceed normally (stem topic remains visible = true)
