@@ -528,6 +528,7 @@ app.post('/get_joke', async (req, res) => {
     }
 
     // Store the joke in the database
+    let jokeId = null;
     try {
       const topicId = await findOrCreateTopic(topic);
       
@@ -541,18 +542,14 @@ app.post('/get_joke', async (req, res) => {
                         'llama3.2:latest';
       const modelId = await findOrCreateModel(modelName);
       
-      await storeJoke(topicId, modelId, stemTopicInfo.stem_topic_id, style, joke, explanation);
+      jokeId = await storeJoke(topicId, modelId, stemTopicInfo.stem_topic_id, style, joke, explanation);
     } catch (dbError) {
       console.error('Database error:', dbError);
-      // Continue serving the joke even if database storage fails
+      return res.render('error', { message: 'Sorry, there was a problem saving your joke. Please try again.' });
     }
 
-    res.render('joke', { 
-      topic: topic, 
-      joke: joke, 
-      explanation: explanation,
-      style: style
-    });
+    // Redirect to the joke detail page
+    res.redirect(`/joke/${jokeId}`);
   } catch (error) {
     res.render('error', { message: 'Sorry, I couldn\'t generate a joke right now. Make sure Ollama is running!' });
   }
