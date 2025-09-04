@@ -6,6 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node dist/app.js",
+    "setup-db": "node setup_database.js",
     "dev": "tsx src/app.ts",
     "dev:watch": "nodemon --exec \"npx tsx src/app.ts\" --ext ts --ignore dist/",
     "build": "tsc",
