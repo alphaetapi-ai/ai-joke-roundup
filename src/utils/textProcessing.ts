@@ -3,27 +3,27 @@ import { ConversationChain } from 'langchain/chains';
 import { BufferMemory } from 'langchain/memory';
 
 // Text processing function to generate stemmed topics
-export function generateStemmedTopic(topicText) {
+export function generateStemmedTopic(topicText: string): string {
   // Convert to lowercase
   const lowercase = topicText.toLowerCase();
   
   // Tokenize the text
   const tokenizer = new natural.WordTokenizer();
-  const tokens = tokenizer.tokenize(lowercase);
+  const tokens: string[] = tokenizer.tokenize(lowercase) || [];
   
   // Remove stop words
   const stopWords = natural.stopwords;
-  const filteredTokens = tokens.filter(token => !stopWords.includes(token));
+  const filteredTokens: string[] = tokens.filter(token => !stopWords.includes(token));
   
   // Stem each remaining token
-  const stemmedTokens = filteredTokens.map(token => natural.PorterStemmer.stem(token));
+  const stemmedTokens: string[] = filteredTokens.map(token => natural.PorterStemmer.stem(token));
   
   // Join with spaces to create the stemmed topic key
   return stemmedTokens.join(' ');
 }
 
 // Content moderation function
-export async function moderateContent(topicText, llm) {
+export async function moderateContent(topicText: string, llm: any): Promise<boolean> {
   try {
     const moderationPrompt = `You are a content moderator for a family-friendly joke website. The user wants to generate a joke about: "${topicText}"
 

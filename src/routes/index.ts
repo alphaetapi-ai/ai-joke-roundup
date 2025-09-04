@@ -1,10 +1,11 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import { getRecentJokes, getRecentJokesCompact, getHighestVotedJoke } from '../database/index.js';
+import type { Joke } from '../types.js';
 
 const router = express.Router();
 
 // Index page with recent jokes and highest voted joke
-router.get('/', async (req, res) => {
+router.get('/', async (req: Request, res: Response) => {
   try {
     const [recentJokes, highestVotedJoke] = await Promise.all([
       getRecentJokesCompact(20),
@@ -19,12 +20,12 @@ router.get('/', async (req, res) => {
 });
 
 // Recent jokes page
-router.get('/recent_jokes', async (req, res) => {
+router.get('/recent_jokes', async (req: Request, res: Response) => {
   try {
     const jokes = await getRecentJokes();
     
     // Process jokes with truncated previews
-    const processedJokes = jokes.map(joke => {
+    const processedJokes = jokes.map((joke: Joke) => {
       let jokePreview = joke.joke_content;
       
       // Truncate to 128 bytes if needed

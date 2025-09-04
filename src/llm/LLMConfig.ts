@@ -2,8 +2,16 @@ import { Ollama } from '@langchain/community/llms/ollama';
 import { ChatAnthropic } from '@langchain/anthropic';
 import { ChatGroq } from '@langchain/groq';
 import { isAWS } from '../config/index.js';
+import type { LLMProviders } from '../types.js';
 
 export class LLMConfig {
+  private isAWS: boolean;
+  private providers: LLMProviders;
+  private llm: any;
+  private selectedProvider: string;
+  private modelName: string;
+  private providerKey: string;
+
   constructor() {
     this.isAWS = isAWS;
     
@@ -12,7 +20,7 @@ export class LLMConfig {
         name: 'Groq',
         modelName: 'llama-3.1-8b-instant',
         create: () => new ChatGroq({
-          apiKey: process.env.GROQ_API_KEY,
+          apiKey: process.env.GROQ_API_KEY!,
           model: 'llama-3.1-8b-instant',
           temperature: 0.7,
         }),
@@ -22,7 +30,7 @@ export class LLMConfig {
         name: 'Anthropic',
         modelName: 'claude-3-haiku-20240307',
         create: () => new ChatAnthropic({
-          apiKey: process.env.ANTHROPIC_API_KEY,
+          apiKey: process.env.ANTHROPIC_API_KEY!,
           model: 'claude-3-haiku-20240307',
           maxTokens: 1024,
         }),
@@ -39,10 +47,13 @@ export class LLMConfig {
       }
     };
 
+    this.selectedProvider = '';
+    this.modelName = '';
+    this.providerKey = '';
     this.initializeLLM();
   }
 
-  initializeLLM() {
+  private initializeLLM(): void {
     console.log(`Environment detected: ${this.isAWS ? 'AWS' : 'Local'}`);
 
     // Priority order: AWS uses cloud-only, Local prefers Ollama then cloud
@@ -53,7 +64,7 @@ export class LLMConfig {
     for (const providerKey of priority) {
       const provider = this.providers[providerKey];
       
-      if (provider.available()) {
+      if (provider?.available()) {
         try {
           this.llm = provider.create();
           this.selectedProvider = provider.name;
@@ -63,7 +74,8 @@ export class LLMConfig {
           console.log(`🤖 Using LLM: ${this.selectedProvider} (${this.isAWS ? 'AWS' : 'Local'})`);
           return;
         } catch (error) {
-          console.warn(`⚠️ Failed to initialize ${provider.name}:`, error.message);
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          console.warn(`⚠️ Failed to initialize ${provider.name}:`, errorMessage);
         }
       }
     }
@@ -76,8 +88,8 @@ export class LLMConfig {
     process.exit(1);
   }
 
-  getLLM() { return this.llm; }
-  getModelName() { return this.modelName; }
-  getProviderName() { return this.selectedProvider; }
-  getProviderKey() { return this.providerKey; }
+  getLLM(): any { return this.llm; }
+  getModelName(): string { return this.modelName; }
+  getProviderName(): string { return this.selectedProvider; }
+  getProviderKey(): string { return this.providerKey; }
 }

@@ -1,12 +1,13 @@
 import crypto from 'crypto';
+import type { Request, Response, NextFunction } from 'express';
 
 // Function to generate visitor nonce
-export function generateVisitorNonce() {
+export function generateVisitorNonce(): string {
   return crypto.randomBytes(16).toString('hex');
 }
 
 // Middleware to ensure visitor has a unique identifier
-export function ensureVisitorCookie(req, res, next) {
+export function ensureVisitorCookie(req: Request, res: Response, next: NextFunction): void {
   if (!req.cookies.visitor_id) {
     const visitorId = generateVisitorNonce();
     res.cookie('visitor_id', visitorId, {

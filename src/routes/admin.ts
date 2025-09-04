@@ -1,10 +1,10 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import { getBlockedTopics, clearBlockedTopics } from '../database/index.js';
 
 const router = express.Router();
 
 // Admin dashboard
-router.get('/admin', async (req, res) => {
+router.get('/admin', async (req: Request, res: Response) => {
   try {
     const blockedTopics = await getBlockedTopics();
     res.render('admin', { blockedTopics: blockedTopics });
@@ -15,7 +15,7 @@ router.get('/admin', async (req, res) => {
 });
 
 // Clear blocked topics
-router.post('/admin/clear-blocked', async (req, res) => {
+router.post('/admin/clear-blocked', async (req: Request, res: Response) => {
   try {
     const deletedCount = await clearBlockedTopics();
     console.log(`Admin action: Cleared ${deletedCount} blocked topics`);

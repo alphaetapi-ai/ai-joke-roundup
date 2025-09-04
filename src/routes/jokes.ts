@@ -1,6 +1,6 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import crypto from 'crypto';
-import mysql from 'mysql2/promise';
+import mysql, { Connection, ResultSetHeader } from 'mysql2/promise';
 import { ConversationChain } from 'langchain/chains';
 import { BufferMemory } from 'langchain/memory';
 import { 
@@ -13,16 +13,17 @@ import {
 } from '../database/index.js';
 import { generateStemmedTopic, moderateContent } from '../utils/textProcessing.js';
 import { JOKE_LIMIT, EXPLANATION_LIMIT, dbConfig } from '../config/index.js';
+import type { VoteRequest } from '../types.js';
 
 const router = express.Router();
 
 // Store conversation history by session (in production, use a proper database)
-const conversations = new Map();
+const conversations = new Map<string, ConversationChain>();
 
 // Joke generation route
-router.post('/generate_joke', async (req, res) => {
+router.post('/generate_joke', async (req: Request, res: Response) => {
   try {
-    const { topic, type = 'normal' } = req.body;
+    const { topic, type = 'normal' }: { topic: string; type?: string } = req.body;
     
     if (!topic || topic.trim().length === 0) {
       return res.status(400).render('error', { message: 'Please enter a topic for the joke.' });
@@ -33,7 +34,7 @@ router.post('/generate_joke', async (req, res) => {
     }
 
     // Get or create conversation for this session
-    const sessionId = req.cookies.sessionId || crypto.randomBytes(8).toString('hex');
+    const sessionId: string = req.cookies.sessionId || crypto.randomBytes(8).toString('hex');
     if (!req.cookies.sessionId) {
       res.cookie('sessionId', sessionId, { maxAge: 24 * 60 * 60 * 1000 }); // 24 hours
     }
@@ -81,7 +82,7 @@ router.post('/generate_joke', async (req, res) => {
     const topicId = await findOrCreateTopic(topic);
     
     // Create the joke generation prompt based on type
-    let jokePrompt;
+    let jokePrompt: string;
     switch (type) {
       case 'story':
         jokePrompt = `Please tell me a funny, family-friendly story about ${topic}. Make it engaging with characters and a humorous situation, but keep it appropriate for all ages. The story should be about 3-5 sentences long.`;
@@ -116,13 +117,13 @@ router.post('/generate_joke', async (req, res) => {
     const providerName = llmConfig.getProviderName();
     
     // Get or create model entry
-    const connection = await mysql.createConnection(dbConfig);
+    const connection: Connection = await mysql.createConnection(dbConfig);
     try {
-      let modelId;
+      let modelId: number;
       const [modelRows] = await connection.execute(
         'SELECT model_id FROM models WHERE model_name = ?',
         [`${providerName}:${modelName}`]
-      );
+      ) as [any[], any];
       
       if (modelRows.length > 0) {
         modelId = modelRows[0].model_id;
@@ -130,7 +131,7 @@ router.post('/generate_joke', async (req, res) => {
         const [modelResult] = await connection.execute(
           'INSERT INTO models (model_name) VALUES (?)',
           [`${providerName}:${modelName}`]
-        );
+        ) as [ResultSetHeader, any];
         modelId = modelResult.insertId;
       }
       
@@ -150,7 +151,7 @@ router.post('/generate_joke', async (req, res) => {
 });
 
 // Individual joke page
-router.get('/joke/:id', async (req, res) => {
+router.get('/joke/:id', async (req: Request, res: Response) => {
   try {
     const jokeId = parseInt(req.params.id);
     const visitorId = req.visitor_id;
@@ -183,17 +184,17 @@ router.get('/joke/:id', async (req, res) => {
 });
 
 // Voting endpoint
-router.post('/vote', async (req, res) => {
+router.post('/vote', async (req: Request, res: Response) => {
   try {
-    const { joke_id, rating } = req.body;
-    const visitorId = req.visitor_id;
+    const { joke_id, rating }: VoteRequest = req.body;
+    const visitorId = req.visitor_id!;
     
     const result = await processVote(joke_id, visitorId, rating);
     res.json(result);
     
   } catch (error) {
     console.error('Vote error:', error);
-    if (error.message === 'Vote conflict - please try again') {
+    if (error instanceof Error && error.message === 'Vote conflict - please try again') {
       res.status(400).json({ message: error.message });
     } else {
       res.status(500).json({ message: 'Error processing vote' });

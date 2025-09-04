@@ -3,3 +3,7 @@ aws-pack.zip
 .env
 local
 aws
+
+# TypeScript compiled output
+dist/
+*.tsbuildinfo
