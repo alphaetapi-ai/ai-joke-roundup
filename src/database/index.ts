@@ -230,29 +230,25 @@ export async function clearBlockedTopics(): Promise<number> {
 export async function getHighestVotedJoke(): Promise<JokeWithDetails | null> {
   const connection: Connection = await mysql.createConnection(dbConfig);
   try {
-    // Calculate vote score as (funny - dud) / total_votes for jokes with votes
+    // Use net score (funny - dud) for joke selection
     const [rows] = await connection.execute(
       `SELECT j.joke_id, j.joke_content, t.topic,
               j.rating_funny, j.rating_okay, j.rating_dud,
               (j.rating_funny + j.rating_okay + j.rating_dud) as total_votes,
-              CASE 
-                WHEN (j.rating_funny + j.rating_okay + j.rating_dud) > 0 
-                THEN (j.rating_funny - j.rating_dud) / (j.rating_funny + j.rating_okay + j.rating_dud)
-                ELSE 0
-              END as vote_score
+              (j.rating_funny - j.rating_dud) as net_score
        FROM jokes j 
        JOIN topics t ON j.topic_id = t.topic_id 
        WHERE (j.rating_funny + j.rating_okay + j.rating_dud) > 0
-       ORDER BY vote_score DESC, j.joke_id DESC`
+       ORDER BY net_score DESC, j.joke_id DESC`
     ) as [any[], any];
     
     if (rows.length === 0) {
       return null; // No jokes with votes
     }
     
-    // Find all jokes with the highest score
-    const highestScore = rows[0].vote_score;
-    const topJokes = rows.filter((joke: any) => joke.vote_score === highestScore);
+    // Find all jokes with the highest net score
+    const highestNetScore = rows[0].net_score;
+    const topJokes = rows.filter((joke: any) => joke.net_score === highestNetScore);
     
     // Return random joke from the winners
     const randomIndex = Math.floor(Math.random() * topJokes.length);
