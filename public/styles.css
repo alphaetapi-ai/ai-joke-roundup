@@ -62,7 +62,7 @@ body::before {
 .recent-list {
     float: right;
     width: 33.33%;
-    background-color: #f9f9f9;
+    background-color: transparent;
     padding: 20px;
     border-radius: 8px;
     text-align: center;
