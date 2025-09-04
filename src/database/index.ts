@@ -99,7 +99,7 @@ export async function storeJoke(topicId: number, modelId: number, stemTopicId: n
   }
 }
 
-export async function getRecentJokes(limit: number = 50): Promise<Joke[]> {
+export async function getRecentJokes(limit: number = 256): Promise<Joke[]> {
   const connection: Connection = await mysql.createConnection(dbConfig);
   try {
     const [rows] = await connection.execute(
