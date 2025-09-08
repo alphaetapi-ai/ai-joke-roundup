@@ -1,7 +1,7 @@
 import { Ollama } from '@langchain/community/llms/ollama';
 import { ChatAnthropic } from '@langchain/anthropic';
 import { ChatGroq } from '@langchain/groq';
-import { isAWS } from '../config/index.js';
+import { isAWS, llmParams } from '../config/index.js';
 import type { LLMProviders } from '../types.js';
 
 export class LLMConfig {
@@ -22,7 +22,9 @@ export class LLMConfig {
         create: () => new ChatGroq({
           apiKey: process.env.GROQ_API_KEY!,
           model: 'llama-3.1-8b-instant',
-          temperature: 0.7,
+          temperature: llmParams.temperature,
+          topP: llmParams.topP,
+          maxTokens: llmParams.maxTokens,
         }),
         available: () => !!process.env.GROQ_API_KEY
       },
@@ -32,7 +34,9 @@ export class LLMConfig {
         create: () => new ChatAnthropic({
           apiKey: process.env.ANTHROPIC_API_KEY!,
           model: 'claude-3-haiku-20240307',
-          maxTokens: 1024,
+          temperature: llmParams.temperature,
+          topP: llmParams.topP,
+          maxTokens: llmParams.maxTokens,
         }),
         available: () => !!process.env.ANTHROPIC_API_KEY
       },
@@ -42,6 +46,9 @@ export class LLMConfig {
         create: () => new Ollama({
           baseUrl: 'http://localhost:11434',
           model: 'llama3.2:latest',
+          temperature: llmParams.temperature,
+          topP: llmParams.topP,
+          numPredict: llmParams.maxTokens,
         }),
         available: () => !this.isAWS // Only available locally
       }
