@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import mysql, { Connection, ResultSetHeader } from 'mysql2/promise';
 import { ConversationChain } from 'langchain/chains';
 import { BufferMemory } from 'langchain/memory';
+import { ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate } from '@langchain/core/prompts';
 import { 
   findOrCreateStemTopic, 
   findOrCreateTopic, 
@@ -12,7 +13,7 @@ import {
   updateStemTopicVisibility 
 } from '../database/index.js';
 import { generateStemmedTopic, moderateContent } from '../utils/textProcessing.js';
-import { JOKE_LIMIT, EXPLANATION_LIMIT, dbConfig } from '../config/index.js';
+import { JOKE_LIMIT, EXPLANATION_LIMIT, dbConfig, systemPrompt } from '../config/index.js';
 import type { VoteRequest } from '../types.js';
 
 const router = express.Router();
@@ -45,9 +46,16 @@ router.post('/generate_joke', async (req: Request, res: Response) => {
 
     let conversation = conversations.get(sessionId);
     if (!conversation) {
+      // Create a custom prompt template with system prompt
+      const chatPrompt = ChatPromptTemplate.fromMessages([
+        SystemMessagePromptTemplate.fromTemplate(systemPrompt),
+        HumanMessagePromptTemplate.fromTemplate("{input}")
+      ]);
+      
       conversation = new ConversationChain({
         llm: llm,
-        memory: new BufferMemory()
+        memory: new BufferMemory(),
+        prompt: chatPrompt
       });
       conversations.set(sessionId, conversation);
     }
