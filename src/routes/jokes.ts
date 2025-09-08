@@ -111,7 +111,7 @@ router.post('/generate_joke', async (req: Request, res: Response) => {
     }
     
     // Ask for an explanation
-    const explanationPrompt = `Please explain briefly why that ${type === 'normal' ? 'joke' : type} about ${topic} is funny. Keep the explanation family-friendly and under 3 sentences.`;
+    const explanationPrompt = `Please explain briefly why this ${type === 'normal' ? 'joke' : type} is funny: "${joke}". Keep the explanation family-friendly and under 3 sentences.`;
     const explanationResponse = await conversation.predict({ input: explanationPrompt });
     
     // Truncate explanation if too long
