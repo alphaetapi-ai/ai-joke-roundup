@@ -1,9 +1,7 @@
 import express, { Request, Response } from 'express';
 import crypto from 'crypto';
 import mysql, { Connection, ResultSetHeader } from 'mysql2/promise';
-import { ConversationChain } from 'langchain/chains';
-import { BufferMemory } from 'langchain/memory';
-import { ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate } from '@langchain/core/prompts';
+import { JokeAgentWorkflow } from '../agents/JokeAgentWorkflow.js';
 import { 
   findOrCreateStemTopic, 
   findOrCreateTopic, 
@@ -18,9 +16,6 @@ import type { VoteRequest } from '../types.js';
 
 const router = express.Router();
 
-// Store conversation history by session (in production, use a proper database)
-const conversations = new Map<string, ConversationChain>();
-
 // Joke generation route
 router.post('/generate_joke', async (req: Request, res: Response) => {
   try {
@@ -34,36 +29,19 @@ router.post('/generate_joke', async (req: Request, res: Response) => {
       return res.status(400).render('error', { message: 'Topic is too long. Please keep it under 100 characters.' });
     }
 
-    // Get or create conversation for this session
-    const sessionId: string = req.cookies.sessionId || crypto.randomBytes(8).toString('hex');
-    if (!req.cookies.sessionId) {
-      res.cookie('sessionId', sessionId, { maxAge: 24 * 60 * 60 * 1000 }); // 24 hours
-    }
-
     // Get LLM instance from app locals
     const llm = req.app.locals.llm;
     const llmConfig = req.app.locals.llmConfig;
 
-    let conversation = conversations.get(sessionId);
-    if (!conversation) {
-      // Create a custom prompt template with system prompt
-      const chatPrompt = ChatPromptTemplate.fromMessages([
-        SystemMessagePromptTemplate.fromTemplate(systemPrompt),
-        HumanMessagePromptTemplate.fromTemplate("{input}")
-      ]);
-      
-      conversation = new ConversationChain({
-        llm: llm,
-        memory: new BufferMemory(),
-        prompt: chatPrompt
-      });
-      conversations.set(sessionId, conversation);
-    }
-
-    // Check content appropriateness
-    const isAppropriate = await moderateContent(topic, llm);
-    if (!isAppropriate) {
-      // Handle blocked topic
+    // Create joke agent workflow
+    const jokeWorkflow = new JokeAgentWorkflow(llm);
+    
+    // Generate joke using the multi-agent workflow
+    const workflowResult = await jokeWorkflow.generateJoke(topic, type);
+    
+    // Handle workflow errors or blocked content
+    if (workflowResult.error || !workflowResult.isAppropriate) {
+      // Handle blocked topic in database
       const stemmedTopic = generateStemmedTopic(topic);
       const stemTopicInfo = await findOrCreateStemTopic(topic, stemmedTopic);
       
@@ -73,11 +51,11 @@ router.post('/generate_joke', async (req: Request, res: Response) => {
       }
       
       return res.status(400).render('error', { 
-        message: 'This topic is not appropriate for our family-friendly joke generator. Please try a different topic!' 
+        message: workflowResult.error || 'This topic is not appropriate for our family-friendly joke generator. Please try a different topic!' 
       });
     }
     
-    // Generate the joke
+    // Check database for topic visibility
     const stemmedTopic = generateStemmedTopic(topic);
     const stemTopicInfo = await findOrCreateStemTopic(topic, stemmedTopic);
     
@@ -89,33 +67,13 @@ router.post('/generate_joke', async (req: Request, res: Response) => {
     
     const topicId = await findOrCreateTopic(topic);
     
-    // Create the joke generation prompt based on type
-    let jokePrompt: string;
-    switch (type) {
-      case 'story':
-        jokePrompt = `Please tell me a funny, family-friendly story about ${topic}. Make it engaging with characters and a humorous situation, but keep it appropriate for all ages. The story should be about 3-5 sentences long.`;
-        break;
-      case 'limerick':
-        jokePrompt = `Please write a funny, family-friendly limerick about ${topic}. Follow the traditional AABBA rhyme scheme and make sure it's appropriate for all ages.`;
-        break;
-      default: // 'normal'
-        jokePrompt = `Please tell me a funny, family-friendly joke about ${topic}. Make sure it's appropriate for all ages.`;
-    }
-    
-    const jokeResponse = await conversation.predict({ input: jokePrompt });
-    
-    // Truncate joke if too long
-    let joke = jokeResponse;
+    // Truncate joke and explanation if too long
+    let joke = workflowResult.joke || '';
     if (joke.length > JOKE_LIMIT) {
       joke = joke.substring(0, JOKE_LIMIT - 3) + '...';
     }
     
-    // Ask for an explanation
-    const explanationPrompt = `Please explain briefly why this ${type === 'normal' ? 'joke' : type} is funny: "${joke}". Keep the explanation family-friendly and under 3 sentences.`;
-    const explanationResponse = await conversation.predict({ input: explanationPrompt });
-    
-    // Truncate explanation if too long
-    let explanation = explanationResponse;
+    let explanation = workflowResult.explanation || '';
     if (explanation.length > EXPLANATION_LIMIT) {
       explanation = explanation.substring(0, EXPLANATION_LIMIT - 3) + '...';
     }
